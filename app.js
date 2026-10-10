@@ -1,7 +1,7 @@
 /* Configuración: usa únicamente la URL y la clave anon/public de Supabase.
    Nunca coloques SUPABASE_SERVICE_ROLE_KEY en el navegador. */
-const SUPABASE_URL = "PEGA_AQUI_TU_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "PEGA_AQUI_TU_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://kgkmjbvsirewbnmsxcts.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "sb_publishable_VS2Q7eAuecprLbL0yKPScA_UrguRC-1";
 
 const $ = (id) => document.getElementById(id);
 const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("PEGA_AQUI") && !SUPABASE_ANON_KEY.includes("PEGA_AQUI");
