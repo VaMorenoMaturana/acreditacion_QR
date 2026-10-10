@@ -22,6 +22,11 @@ create table if not exists public.attendees (
   created_at timestamptz not null default now()
 );
 
+
+
+-- Migración segura para proyectos que ya ejecutaron una versión anterior del esquema.
+alter table public.attendees add column if not exists checked_out_at timestamptz null;
+
 create index if not exists attendees_checked_in_at_idx on public.attendees(checked_in_at);
 create index if not exists attendees_full_name_idx on public.attendees(full_name);
 
@@ -115,3 +120,79 @@ end $$;
 
 -- Seguridad adicional: no habilites permisos de lectura pública para attendees.
 -- Revisa las políticas en Supabase antes de usar datos reales.
+
+
+-- Consultar un QR sin registrar todavía el ingreso. Permite mostrar el popup de confirmación.
+create or replace function public.lookup_ticket(p_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_attendee public.attendees%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if not exists (select 1 from public.user_profiles p where p.id=auth.uid() and p.role in ('admin','staff')) then
+    raise exception 'Access denied';
+  end if;
+  select * into v_attendee from public.attendees where qr_token=p_token;
+  if not found then return jsonb_build_object('status','invalid'); end if;
+  return jsonb_build_object(
+    'status','valid','full_name',v_attendee.full_name,'email',v_attendee.email,
+    'organization',v_attendee.organization,'checked_in_at',v_attendee.checked_in_at,
+    'checked_out_at',v_attendee.checked_out_at
+  );
+end;
+$$;
+
+create or replace function public.check_in_ticket(p_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_attendee public.attendees%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if not exists (select 1 from public.user_profiles p where p.id=auth.uid() and p.role in ('admin','staff')) then
+    raise exception 'Access denied';
+  end if;
+  select * into v_attendee from public.attendees where qr_token=p_token for update;
+  if not found then return jsonb_build_object('status','invalid'); end if;
+  if v_attendee.checked_in_at is not null then
+    return jsonb_build_object('status','already_checked_in','full_name',v_attendee.full_name,'checked_in_at',v_attendee.checked_in_at);
+  end if;
+  update public.attendees set checked_in_at=now(), checked_in_by=auth.uid(), checked_out_at=null
+    where id=v_attendee.id returning * into v_attendee;
+  return jsonb_build_object('status','valid','full_name',v_attendee.full_name,'checked_in_at',v_attendee.checked_in_at);
+end;
+$$;
+
+create or replace function public.mark_departure(p_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_attendee public.attendees%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if not exists (select 1 from public.user_profiles p where p.id=auth.uid() and p.role in ('admin','staff')) then
+    raise exception 'Access denied';
+  end if;
+  select * into v_attendee from public.attendees where qr_token=p_token for update;
+  if not found then return jsonb_build_object('status','invalid'); end if;
+  if v_attendee.checked_in_at is null then return jsonb_build_object('status','not_checked_in'); end if;
+  if v_attendee.checked_out_at is not null then return jsonb_build_object('status','already_left','checked_out_at',v_attendee.checked_out_at); end if;
+  update public.attendees set checked_out_at=now() where id=v_attendee.id returning * into v_attendee;
+  return jsonb_build_object('status','left','full_name',v_attendee.full_name,'checked_out_at',v_attendee.checked_out_at);
+end;
+$$;
+
+revoke all on function public.lookup_ticket(uuid) from public, anon;
+revoke all on function public.check_in_ticket(uuid) from public, anon;
+revoke all on function public.mark_departure(uuid) from public, anon;
+grant execute on function public.lookup_ticket(uuid) to authenticated;
+grant execute on function public.check_in_ticket(uuid) to authenticated;
+grant execute on function public.mark_departure(uuid) to authenticated;
+\n-- La interfaz actual requiere confirmación explícita antes de registrar el ingreso.\nrevoke all on function public.validate_and_check_in(uuid) from authenticated;\n

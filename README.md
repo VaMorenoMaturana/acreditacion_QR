@@ -91,3 +91,18 @@ También puedes usar el `render.yaml` como referencia para crear el Static Site.
 ## Alcance de esta entrega
 
 Es un prototipo funcional de base para un proyecto simple; requiere configurar Supabase y desplegarlo en Render. No se considera una auditoría de seguridad ni una certificación de cumplimiento normativo.
+
+
+## Actualización de funciones (popup, CSV y salidas)
+
+Si ya habías ejecutado una versión anterior de `supabase/schema.sql`, vuelve a ejecutar el archivo actualizado completo en SQL Editor. Incluye `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` para la columna de salida y crea las nuevas funciones RPC. Si Supabase informa de un error, no continúes con datos reales hasta resolverlo.
+
+Novedades:
+- Al escanear, se consulta la invitación y aparece una ventana con nombre, organización, correo y estado. El ingreso solo se registra al pulsar **Ingresar**.
+- Importación CSV (separador coma o punto y coma) con columnas `nombre`, `correo`, `organizacion`. Puedes descargar una plantilla desde Administración.
+- El botón **Descargar QR en ZIP** genera PNG individuales para todos los invitados cargados.
+- El administrador puede eliminar un invitado individual o todos los registros; ambas acciones solicitan confirmación.
+- **Marcar salida** registra cuándo se fue una persona que ya había ingresado. La salida no elimina ni invalida su invitación.
+- El panel sigue mostrando asistencia acumulada; la columna de estado distingue Pendiente, Ingresó y Se fue.
+
+Importación: para evitar duplicados, el sistema agrega nuevos registros y no intenta actualizar existentes. Revisa el CSV antes de importarlo. La importación en bloques puede quedar parcialmente completada si falla un bloque; el mensaje indicará que hubo un error y conviene revisar la tabla antes de reintentar.

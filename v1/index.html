@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12233f">
+  <title>Liderazgo en 100 Palabras | Acreditación</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark">100</div>
+    <div><strong>Liderazgo en 100 Palabras</strong><span>Control de acceso · Ceremonia</span></div>
+    <button id="logoutBtn" class="button button-quiet hidden">Cerrar sesión</button>
+  </header>
+
+  <main class="container">
+    <section id="setupNotice" class="panel notice hidden">
+      <h2>Configuración pendiente</h2>
+      <p>Antes de usar la aplicación, configura las variables <code>SUPABASE_URL</code> y <code>SUPABASE_ANON_KEY</code> en <code>app.js</code>. No uses nunca una clave <em>service_role</em> en esta web.</p>
+    </section>
+
+    <section id="loginView" class="panel login-panel">
+      <div class="eyebrow">ACCESO DEL EQUIPO</div>
+      <h1>Control de acreditación</h1>
+      <p class="muted">Ingresa con tu cuenta institucional para validar invitaciones y registrar llegadas.</p>
+      <form id="loginForm">
+        <label for="email">Correo electrónico</label>
+        <input id="email" type="email" autocomplete="username" required placeholder="equipo@fundacion.cl">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" required placeholder="Tu contraseña">
+        <button class="button button-primary full" type="submit">Ingresar</button>
+        <p id="loginError" class="error" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="appView" class="hidden">
+      <div class="welcome-row">
+        <div><div class="eyebrow">PANEL DE OPERACIONES</div><h1 id="welcomeTitle">Bienvenido</h1><p id="roleDescription" class="muted"></p></div>
+        <span id="rolePill" class="pill">Equipo</span>
+      </div>
+
+      <nav class="tabs" aria-label="Secciones">
+        <button class="tab active" data-tab="scanPanel" id="scanTab">Escanear QR</button>
+        <button class="tab hidden" data-tab="adminPanel" id="adminTab">Administración</button>
+      </nav>
+
+      <section id="scanPanel" class="panel">
+        <div class="section-heading"><div><div class="eyebrow">ACCESO</div><h2>Validar invitación</h2></div><span class="status-dot">En línea</span></div>
+        <p class="muted">Autoriza el acceso a la cámara cuando el navegador lo solicite. También puedes ingresar el código manualmente.</p>
+        <div class="scanner-wrap"><div id="reader"></div></div>
+        <div class="button-row">
+          <button id="startScanBtn" class="button button-primary">Activar cámara</button>
+          <button id="stopScanBtn" class="button button-secondary" disabled>Detener cámara</button>
+        </div>
+        <form id="manualForm" class="manual-form">
+          <label for="manualCode">Código manual</label>
+          <div class="inline-form"><input id="manualCode" placeholder="L100P: código de invitación" autocomplete="off"><button class="button button-secondary" type="submit">Validar</button></div>
+        </form>
+        <div id="scanResult" class="result hidden" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="adminPanel" class="hidden">
+        <div class="stats-grid">
+          <article class="stat-card"><span>Invitados registrados</span><strong id="totalCount">—</strong></article>
+          <article class="stat-card"><span>Ingresados</span><strong id="checkedCount">—</strong></article>
+          <article class="stat-card"><span>Pendientes</span><strong id="pendingCount">—</strong></article>
+          <article class="stat-card"><span>Asistencia</span><strong id="attendanceRate">—</strong></article>
+        </div>
+        <section class="panel">
+          <div class="section-heading"><div><div class="eyebrow">PREPARACIÓN</div><h2>Crear invitaciones</h2></div></div>
+          <p class="muted">Cada persona recibe un código aleatorio. El QR no contiene nombre, correo ni otros datos personales.</p>
+          <form id="attendeeForm" class="attendee-form">
+            <div class="form-grid">
+              <div><label for="attendeeName">Nombre completo *</label><input id="attendeeName" required maxlength="160" placeholder="Nombre Apellido"></div>
+              <div><label for="attendeeEmail">Correo (opcional)</label><input id="attendeeEmail" type="email" maxlength="254" placeholder="persona@correo.cl"></div>
+              <div><label for="attendeeOrg">Organización (opcional)</label><input id="attendeeOrg" maxlength="160" placeholder="Organización"></div>
+            </div>
+            <button class="button button-primary" type="submit">Crear invitación y descargar QR</button>
+            <p id="createError" class="error" role="alert"></p>
+          </form>
+        </section>
+        <section class="panel">
+          <div class="section-heading"><div><div class="eyebrow">SEGUIMIENTO EN TIEMPO REAL</div><h2>Estado de asistentes</h2></div><button id="refreshBtn" class="button button-secondary button-small">Actualizar</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Invitado</th><th>Organización</th><th>Estado</th><th>Hora de ingreso</th><th>QR</th></tr></thead><tbody id="attendeesTable"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody></table></div>
+        </section>
+      </section>
+    </section>
+    <footer>Fundación Espacio Mejor · Herramienta interna de acreditación</footer>
+  </main>
+  <div id="qrDownloadStage" class="qr-download-stage" aria-hidden="true"></div>
+  <script src="app.js"></script>
+</body>
+</html>

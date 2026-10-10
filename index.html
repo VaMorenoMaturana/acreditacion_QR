@@ -9,6 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -84,12 +85,35 @@
           </form>
         </section>
         <section class="panel">
-          <div class="section-heading"><div><div class="eyebrow">SEGUIMIENTO EN TIEMPO REAL</div><h2>Estado de asistentes</h2></div><button id="refreshBtn" class="button button-secondary button-small">Actualizar</button></div>
-          <div class="table-wrap"><table><thead><tr><th>Invitado</th><th>Organización</th><th>Estado</th><th>Hora de ingreso</th><th>QR</th></tr></thead><tbody id="attendeesTable"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody></table></div>
+          <div class="section-heading"><div><div class="eyebrow">CARGA MASIVA</div><h2>Importar invitados desde CSV</h2></div></div>
+          <p class="muted">Para unos 200 invitados, prepara un CSV con las columnas <code>nombre</code>, <code>correo</code> y <code>organizacion</code>. Solo nombre es obligatorio. La importación crea los registros; luego podrás descargar todos los QR en un ZIP.</p>
+          <div class="button-row import-row">
+            <button id="templateCsvBtn" class="button button-secondary" type="button">Descargar plantilla CSV</button>
+            <label class="button button-secondary file-button" for="csvFile">Seleccionar CSV</label>
+            <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden">
+          </div>
+          <p id="csvStatus" class="muted" aria-live="polite"></p>
+        </section>
+        <section class="panel">
+          <div class="section-heading"><div><div class="eyebrow">SEGUIMIENTO EN TIEMPO REAL</div><h2>Estado de asistentes</h2></div><div class="button-row"><button id="refreshBtn" class="button button-secondary button-small">Actualizar</button><button id="downloadAllQrBtn" class="button button-secondary button-small">Descargar QR en ZIP</button><button id="deleteAllBtn" class="button button-danger button-small">Eliminar todos</button></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Invitado</th><th>Organización</th><th>Estado</th><th>Ingreso / salida</th><th>Acciones</th></tr></thead><tbody id="attendeesTable"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody></table></div>
         </section>
       </section>
     </section>
     <footer>Fundación Espacio Mejor · Herramienta interna de acreditación</footer>
+    <div id="attendeeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <section class="modal-card">
+        <button id="closeModalBtn" class="modal-close" aria-label="Cerrar">×</button>
+        <div class="eyebrow">VALIDACIÓN DE INVITACIÓN</div>
+        <h2 id="modalTitle">Invitado</h2>
+        <div id="modalDetails" class="modal-details"></div>
+        <div id="modalStatus" class="modal-status"></div>
+        <div class="button-row modal-actions">
+          <button id="confirmCheckinBtn" class="button button-primary">Ingresar</button>
+          <button id="cancelModalBtn" class="button button-secondary">Cancelar</button>
+        </div>
+      </section>
+    </div>
   </main>
   <div id="qrDownloadStage" class="qr-download-stage" aria-hidden="true"></div>
   <script src="app.js"></script>
