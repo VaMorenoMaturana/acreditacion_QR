@@ -1,5 +1,5 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { ticketCss, ticketMarkup } from "./ticket-template.js";
+import { ticketMarkup } from "./ticket-template.js";
 
 const $ = id => document.getElementById(id);
 const validConfig = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("TU-PROYECTO") &&
@@ -18,6 +18,13 @@ function table(headers, rows){if(!rows.length)return '<p class="muted">Sin regis
 function activityOptions(selectId, includeAll=false){const select=$(selectId);if(!select)return;const old=select.value;select.innerHTML=(includeAll?'<option value="">Todas las actividades</option>':'')+activities.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}${a.status==="closed"?" (cerrada)":""}</option>`).join("");if([...select.options].some(o=>o.value===old))select.value=old;}
 function selectedActivity(id){return activities.find(a=>a.id===id);}
 function selectedRegistration(id){return registrations.find(r=>r.id===id);}
+function ticketDateLabel(value){
+ if(!value)return "—";
+ const date=new Date(value+"T12:00:00Z");
+ const month=new Intl.DateTimeFormat("es-CL",{month:"short",timeZone:"UTC"}).format(date).replace(/\.$/,"");
+ return `${date.getUTCDate()} de ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
+}
+function ticketTime(value){return value?value.slice(0,5):"";}
 async function loadAll(){
   const [a,r,c,p]=await Promise.all([
     supabase.from("activities").select("*").order("event_date",{ascending:false}),
@@ -92,21 +99,15 @@ async function importCsv(){
 }
 function ticketDocument(reg){
  const a=selectedActivity(reg.activity_id);if(!a)throw new Error("No se encontró la actividad de esta inscripción.");
- const host=document.createElement("div");host.innerHTML=`<style>${ticketCss}
- .ticket{width:297mm;height:96.0795mm;max-width:none;aspect-ratio:auto;margin:0;border-radius:0;box-shadow:none}
- .ticket-main{top:8.5%;height:50%}
- .asset-slot{cursor:default}.asset-slot .placeholder{display:none!important}
- </style><article class="ticket">${ticketMarkup}</article>`;
+ const host=document.createElement("div");host.innerHTML=`<article class="ticket">${ticketMarkup}</article>`;
  const root=host.querySelector(".ticket");
  const set=(id,text)=>{const el=root.querySelector("#"+id);if(el)el.textContent=text||"";};
  set("previewPerson",reg.attendee.full_name);set("previewOrg",reg.attendee.organization||"");
  set("previewEventName",a.name);set("previewEventDesc",a.tagline||a.description||"");
- set("previewDate",dateLabel(a.event_date));set("previewTime",`${a.start_time||""}${a.end_time?"–"+a.end_time:""}`);set("previewPlace",a.place);
- set("previewGreeting","Gracias por acompañarnos en la<br>la actividad");
- // Restore line break for greeting without interpreting user data.
- const greeting=root.querySelector("#previewGreeting");greeting.innerHTML="Gracias por acompañarnos en la<br>actividad";
+ const start=ticketTime(a.start_time),end=ticketTime(a.end_time);
+ set("previewDate",ticketDateLabel(a.event_date));set("previewTime",start?`${start}${end?"–"+end:""}`:"Por definir");set("previewPlace",a.place);
  const imgs=[["logoPreview",a.institution_logo],["projectLogoPreview",a.project_logo],["partnerLogoPreview",a.partner_logo]];
- imgs.forEach(([id,src])=>{const img=root.querySelector("#"+id);if(src){img.src=src;img.hidden=false;img.style.display="block";}});
+ imgs.forEach(([id,src])=>{const img=root.querySelector("#"+id);if(src){img.src=src;img.hidden=false;img.style.display="block";}else img.remove();});
  const qr=root.querySelector("#qrPreview");qr.removeAttribute("src");qr.alt="Código QR";
  const qrHolder=document.createElement("div");qrHolder.style.cssText="position:absolute;left:-99999px;top:0";
  document.body.appendChild(qrHolder);
@@ -114,23 +115,53 @@ function ticketDocument(reg){
  const canvas=qrHolder.querySelector("canvas");if(canvas)qr.src=canvas.toDataURL("image/png");qrHolder.remove();
  return root;
 }
+function resizeTicketPreview(){
+ const frame=$("ticketPreview").querySelector(".ticket-preview-frame"),ticket=frame?.querySelector(".ticket");
+ if(!frame||!ticket)return;
+ const width=ticket.offsetWidth,available=frame.clientWidth;
+ if(width&&available)ticket.style.transform=`scale(${Math.min(1,available/width)})`;
+}
 function renderTicketPreview(){
- const id=$("ticketRegistration").value,reg=selectedRegistration(id);$("ticketPreview").innerHTML="";if(!reg)return;
- try{$("ticketPreview").appendChild(ticketDocument(reg));}catch(e){$("ticketPreview").textContent=e.message;}
+ const id=$("ticketRegistration").value,reg=selectedRegistration(id),preview=$("ticketPreview");preview.innerHTML="";if(!reg)return;
+ try{
+  const frame=document.createElement("div");frame.className="ticket-preview-frame";
+  frame.appendChild(ticketDocument(reg));preview.appendChild(frame);resizeTicketPreview();
+ }catch(e){preview.textContent=e.message;}
+}
+new ResizeObserver(resizeTicketPreview).observe($("ticketPreview"));
+function pdfWorker(root,scale=2){
+ return html2pdf().set({
+  margin:3,
+  image:{type:"jpeg",quality:.98},
+  html2canvas:{
+   scale,useCORS:true,backgroundColor:"#fff",logging:false,scrollX:0,scrollY:0,
+   onclone:clonedDocument=>{
+    const stage=clonedDocument.getElementById("pdfStage");
+    if(stage)Object.assign(stage.style,{left:"0px",top:"0px",opacity:"1",zIndex:"9999"});
+   }
+  },
+  jsPDF:{unit:"mm",format:[303,104.08],orientation:"landscape"}
+ }).from(root);
+}
+async function waitForTicketImages(root){
+ const images=[...root.querySelectorAll("img")].filter(image=>image.getAttribute("src"));
+ await Promise.all(images.map(image=>image.decode()));
 }
 async function downloadPdf(reg){
- const root=ticketDocument(reg);$("pdfStage").innerHTML="";$("pdfStage").appendChild(root);
- await new Promise(resolve=>setTimeout(resolve,150));
- const name=(reg.attendee.full_name||"entrada").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);
- await html2pdf().set({margin:0,filename:`entrada-${name}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:null,logging:false},jsPDF:{unit:"mm",format:[303,102.08],orientation:"landscape"}}).from(root).save();
- $("pdfStage").innerHTML="";
+ const root=ticketDocument(reg),stage=$("pdfStage");
+ stage.innerHTML="";stage.appendChild(root);
+ try{
+  await waitForTicketImages(root);
+  const name=(reg.attendee.full_name||"entrada").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);
+  await pdfWorker(root).set({filename:`entrada-${name}.pdf`}).save();
+ }finally{stage.innerHTML="";}
 }
 async function downloadOne(){const reg=selectedRegistration($("ticketRegistration").value);if(!reg){say("ticketMessage","Selecciona una inscripción.",true);return;}try{await downloadPdf(reg);say("ticketMessage","PDF generado.");}catch(e){say("ticketMessage",e.message,true);}}
 async function downloadZip(){
  const aid=val("ticketActivity"),list=registrations.filter(r=>r.activity_id===aid&&r.status!=="cancelled");if(!list.length){say("ticketMessage","No hay inscripciones para esta actividad.",true);return;}
  const btn=$("downloadZipBtn");btn.disabled=true;btn.textContent="Generando ZIP…";
- try{const zip=new JSZip();for(let i=0;i<list.length;i++){const reg=list[i];const root=ticketDocument(reg);$("pdfStage").innerHTML="";$("pdfStage").appendChild(root);const worker=html2pdf().set({margin:0,image:{type:"jpeg",quality:.96},html2canvas:{scale:1.6,useCORS:true,backgroundColor:null},jsPDF:{unit:"mm",format:[303,102.08],orientation:"landscape"}}).from(root).toPdf();const pdf=await worker.get("pdf");const blob=pdf.output("blob");const safe=(reg.attendee.full_name||"entrada").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);zip.file(`${String(i+1).padStart(3,"0")}-${safe}.pdf`,blob);$("ticketMessage").textContent=`Generando entradas: ${i+1}/${list.length}`;}
-  $("pdfStage").innerHTML="";const blob=await zip.generateAsync({type:"blob"});const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="espacio-acredita-entradas.zip";link.click();URL.revokeObjectURL(url);say("ticketMessage",`ZIP generado con ${list.length} entradas.`);
+ try{const zip=new JSZip(),stage=$("pdfStage");for(let i=0;i<list.length;i++){const reg=list[i],root=ticketDocument(reg);stage.innerHTML="";stage.appendChild(root);await waitForTicketImages(root);const pdf=await pdfWorker(root,1.6).toPdf().get("pdf");const blob=pdf.output("blob");const safe=(reg.attendee.full_name||"entrada").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);zip.file(`${String(i+1).padStart(3,"0")}-${safe}.pdf`,blob);$("ticketMessage").textContent=`Generando entradas: ${i+1}/${list.length}`;}
+  stage.innerHTML="";const blob=await zip.generateAsync({type:"blob"});const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="espacio-acredita-entradas.zip";link.click();URL.revokeObjectURL(url);say("ticketMessage",`ZIP generado con ${list.length} entradas.`);
  }catch(e){$("pdfStage").innerHTML="";say("ticketMessage",e.message,true);}finally{btn.disabled=false;btn.textContent="Descargar todas las entradas (ZIP)";}
 }
 function parseQr(decoded){const raw=String(decoded||"").trim();const prefixes=["ESPACIO-ACREDITA:","EA:"];for(const p of prefixes)if(raw.startsWith(p))return raw.slice(p.length);return raw;}
@@ -152,7 +183,7 @@ async function editActivity(id){const a=selectedActivity(id);if(!a)return;$("act
 async function toggleActivity(id){const a=selectedActivity(id);if(!a)return;const {error}=await supabase.from("activities").update({status:a.status==="open"?"closed":"open"}).eq("id",id);if(error)alert(error.message);else await loadAll();}
 async function cancelRegistration(id){if(!confirm("¿Cancelar esta inscripción? El QR dejará de ser válido."))return;const {error}=await supabase.from("registrations").update({status:"cancelled"}).eq("id",id);if(error)alert(error.message);else await loadAll();}
 async function saveRole(id){const role=document.querySelector(`[data-role-user="${id}"]`).value;const {error}=await supabase.from("profiles").update({role}).eq("id",id);if(error)alert(error.message);else await loadAll();}
-function switchTab(name){document.querySelectorAll(".tab-panel").forEach(x=>x.classList.add("hidden"));$("tab-"+name)?.classList.remove("hidden");document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));}
+function switchTab(name){document.querySelectorAll(".tab-panel").forEach(x=>x.classList.add("hidden"));$("tab-"+name)?.classList.remove("hidden");document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));if(name==="tickets")resizeTicketPreview();}
 $("loginForm").addEventListener("submit",async ev=>{ev.preventDefault();say("loginMessage","Iniciando sesión…");if(!supabase){say("loginMessage","Configura Supabase en src/config.js.",true);return;}const {data,error}=await supabase.auth.signInWithPassword({email:val("loginEmail"),password:$("loginPassword").value});if(error){say("loginMessage",error.message,true);return;}currentUser=data.user;await afterLogin();});
 $("logoutBtn").addEventListener("click",async()=>{await stopScanner();await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);});
 async function afterLogin(){const {data,error}=await supabase.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();if(error||!data){say("loginMessage","La cuenta no tiene perfil autorizado. Solicita al administrador que la habilite.",true);await supabase.auth.signOut();return;}currentProfile=data;setSignedIn(true);await loadAll();switchTab("dashboard");}

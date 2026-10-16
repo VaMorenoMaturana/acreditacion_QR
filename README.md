@@ -33,7 +33,7 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 
 ## Plantilla del ticket
 - `ticket-template-original.html` es el archivo original adjunto, preservado sin modificaciones.
-- `src/ticket-template.js` deriva el CSS y el markup del ticket para generar PDF dentro de la aplicación.
+- `src/ticket-template.js` conserva el markup del ticket y `src/ticket.css` define sus estilos compartidos para vista previa y exportación PDF.
 - Los campos se rellenan desde la actividad y la inscripción. El QR contiene un token aleatorio UUID de la base de datos, no nombre, correo ni otros datos personales.
 - La versión de la plantilla original puede incluir un QR de demostración. No uses ese QR para acreditar asistentes reales.
 
