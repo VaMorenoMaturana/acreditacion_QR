@@ -1,121 +1,106 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#12233f">
-  <title>Liderazgo en 100 Palabras | Acreditación</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espacio Acredita | Fundación Espacio Mejor</title>
+<link rel="stylesheet" href="./styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand-mark">100</div>
-    <div><strong>Liderazgo en 100 Palabras</strong><span>Control de acceso · Ceremonia</span></div>
-    <button id="logoutBtn" class="button button-quiet hidden">Cerrar sesión</button>
-  </header>
-
-  <main class="container">
-    <section id="setupNotice" class="panel notice hidden">
-      <h2>Configuración pendiente</h2>
-      <p>Antes de usar la aplicación, configura las variables <code>SUPABASE_URL</code> y <code>SUPABASE_ANON_KEY</code> en <code>app.js</code>. No uses nunca una clave <em>service_role</em> en esta web.</p>
-    </section>
-
-    <section id="loginView" class="panel login-panel">
-      <div class="eyebrow">ACCESO DEL EQUIPO</div>
-      <h1>Control de acreditación</h1>
-      <p class="muted">Ingresa con tu cuenta institucional para validar invitaciones y registrar llegadas.</p>
-      <form id="loginForm">
-        <label for="email">Correo electrónico</label>
-        <input id="email" type="email" autocomplete="username" required placeholder="equipo@fundacion.cl">
-        <label for="password">Contraseña</label>
-        <input id="password" type="password" autocomplete="current-password" required placeholder="Tu contraseña">
-        <button class="button button-primary full" type="submit">Ingresar</button>
-        <p id="loginError" class="error" role="alert"></p>
-      </form>
-    </section>
-
-    <section id="appView" class="hidden">
-      <div class="welcome-row">
-        <div><div class="eyebrow">PANEL DE OPERACIONES</div><h1 id="welcomeTitle">Bienvenido</h1><p id="roleDescription" class="muted"></p></div>
-        <span id="rolePill" class="pill">Equipo</span>
-      </div>
-
-      <nav class="tabs" aria-label="Secciones">
-        <button class="tab active" data-tab="scanPanel" id="scanTab">Escanear QR</button>
-        <button class="tab hidden" data-tab="adminPanel" id="adminTab">Administración</button>
-      </nav>
-
-      <section id="scanPanel" class="panel">
-        <div class="section-heading"><div><div class="eyebrow">ACCESO</div><h2>Validar invitación</h2></div><span class="status-dot">En línea</span></div>
-        <p class="muted">Autoriza el acceso a la cámara cuando el navegador lo solicite. También puedes ingresar el código manualmente.</p>
-        <div class="scanner-wrap"><div id="reader"></div></div>
-        <div class="button-row">
-          <button id="startScanBtn" class="button button-primary">Activar cámara</button>
-          <button id="stopScanBtn" class="button button-secondary" disabled>Detener cámara</button>
-        </div>
-        <form id="manualForm" class="manual-form">
-          <label for="manualCode">Código manual</label>
-          <div class="inline-form"><input id="manualCode" placeholder="L100P: código de invitación" autocomplete="off"><button class="button button-secondary" type="submit">Validar</button></div>
-        </form>
-        <div id="scanResult" class="result hidden" role="status" aria-live="polite"></div>
-      </section>
-
-      <section id="adminPanel" class="hidden">
-        <div class="stats-grid">
-          <article class="stat-card"><span>Invitados registrados</span><strong id="totalCount">—</strong></article>
-          <article class="stat-card"><span>Ingresados</span><strong id="checkedCount">—</strong></article>
-          <article class="stat-card"><span>Pendientes</span><strong id="pendingCount">—</strong></article>
-          <article class="stat-card"><span>Asistencia</span><strong id="attendanceRate">—</strong></article>
-        </div>
-        <section class="panel">
-          <div class="section-heading"><div><div class="eyebrow">PREPARACIÓN</div><h2>Crear invitaciones</h2></div></div>
-          <p class="muted">Cada persona recibe un código aleatorio. El QR no contiene nombre, correo ni otros datos personales.</p>
-          <form id="attendeeForm" class="attendee-form">
-            <div class="form-grid">
-              <div><label for="attendeeName">Nombre completo *</label><input id="attendeeName" required maxlength="160" placeholder="Nombre Apellido"></div>
-              <div><label for="attendeeEmail">Correo (opcional)</label><input id="attendeeEmail" type="email" maxlength="254" placeholder="persona@correo.cl"></div>
-              <div><label for="attendeeOrg">Organización (opcional)</label><input id="attendeeOrg" maxlength="160" placeholder="Organización"></div>
-            </div>
-            <button class="button button-primary" type="submit">Crear invitación y descargar QR</button>
-            <p id="createError" class="error" role="alert"></p>
-          </form>
-        </section>
-        <section class="panel">
-          <div class="section-heading"><div><div class="eyebrow">CARGA MASIVA</div><h2>Importar invitados desde CSV</h2></div></div>
-          <p class="muted">Para unos 200 invitados, prepara un CSV con las columnas <code>nombre</code>, <code>correo</code> y <code>organizacion</code>. Solo nombre es obligatorio. La importación crea los registros; luego podrás descargar todos los QR en un ZIP.</p>
-          <div class="button-row import-row">
-            <button id="templateCsvBtn" class="button button-secondary" type="button">Descargar plantilla CSV</button>
-            <label class="button button-secondary file-button" for="csvFile">Seleccionar CSV</label>
-            <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden">
-          </div>
-          <p id="csvStatus" class="muted" aria-live="polite"></p>
-        </section>
-        <section class="panel">
-          <div class="section-heading"><div><div class="eyebrow">SEGUIMIENTO EN TIEMPO REAL</div><h2>Estado de asistentes</h2></div><div class="button-row"><button id="refreshBtn" class="button button-secondary button-small">Actualizar</button><button id="downloadAllQrBtn" class="button button-secondary button-small">Descargar QR en ZIP</button><button id="deleteAllBtn" class="button button-danger button-small">Eliminar todos</button></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Invitado</th><th>Organización</th><th>Estado</th><th>Ingreso / salida</th><th>Acciones</th></tr></thead><tbody id="attendeesTable"><tr><td colspan="5" class="muted">Cargando…</td></tr></tbody></table></div>
-        </section>
-      </section>
-    </section>
-    <footer>Fundación Espacio Mejor · Herramienta interna de acreditación</footer>
-    <div id="attendeeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <section class="modal-card">
-        <button id="closeModalBtn" class="modal-close" aria-label="Cerrar">×</button>
-        <div class="eyebrow">VALIDACIÓN DE INVITACIÓN</div>
-        <h2 id="modalTitle">Invitado</h2>
-        <div id="modalDetails" class="modal-details"></div>
-        <div id="modalStatus" class="modal-status"></div>
-        <div class="button-row modal-actions">
-          <button id="confirmCheckinBtn" class="button button-primary">Ingresar</button>
-          <button id="cancelModalBtn" class="button button-secondary">Cancelar</button>
-        </div>
-      </section>
+<header class="topbar">
+  <div><strong>ESPACIO ACREDITA</strong><small>Sistema de registro y acreditación de actividades · Fundación Espacio Mejor</small></div>
+  <div id="sessionArea" class="session-area"><span id="userLabel"></span><button id="logoutBtn" class="secondary hidden">Cerrar sesión</button></div>
+</header>
+<main>
+<section id="setupNotice" class="notice hidden">
+  <h2>Configuración pendiente</h2><p>Agrega la URL y la clave pública (anon/publishable) de tu proyecto Supabase en <code>src/config.js</code>. Nunca uses una clave <code>service_role</code> en el navegador.</p>
+</section>
+<section id="loginView" class="auth panel">
+  <h1>Acceso interno</h1><p class="muted">Solo personal autorizado puede gestionar actividades y acreditaciones.</p>
+  <form id="loginForm">
+    <label>Correo institucional<input id="loginEmail" type="email" autocomplete="username" required></label>
+    <label>Contraseña<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit">Iniciar sesión</button>
+    <p id="loginMessage" class="message" role="status"></p>
+  </form>
+</section>
+<section id="appView" class="hidden">
+  <nav class="tabs" aria-label="Módulos">
+    <button data-tab="dashboard" class="active">Resumen</button>
+    <button data-tab="activities">Actividades</button>
+    <button data-tab="registrations">Inscripciones</button>
+    <button data-tab="tickets">Entradas PDF/ZIP</button>
+    <button data-tab="checkin">Acreditación QR</button>
+    <button data-tab="admin" id="adminTab">Administración</button>
+  </nav>
+  <section id="tab-dashboard" class="tab-panel">
+    <div class="page-head"><div><h1>Resumen</h1><p class="muted">Estado de las actividades y acreditaciones.</p></div><button class="primary" data-goto="activities">Crear actividad</button></div>
+    <div class="stats"><article class="stat"><span>Actividades abiertas</span><strong id="statActivities">0</strong></article><article class="stat"><span>Inscripciones</span><strong id="statRegistrations">0</strong></article><article class="stat"><span>Acreditadas</span><strong id="statChecked">0</strong></article><article class="stat"><span>Pendientes</span><strong id="statPending">0</strong></article></div>
+    <div class="panel"><h2>Actividades recientes</h2><div id="recentActivities" class="table-wrap"></div></div>
+  </section>
+  <section id="tab-activities" class="tab-panel hidden">
+    <div class="page-head"><div><h1>Actividades</h1><p class="muted">Cada inscripción y QR queda asociada a una actividad.</p></div></div>
+    <div class="panel"><h2>Nueva actividad / editar seleccionada</h2>
+      <form id="activityForm" class="form-grid">
+        <input type="hidden" id="activityId">
+        <label>Nombre *<input id="activityName" required maxlength="180"></label>
+        <label>Lugar *<input id="activityPlace" required maxlength="180"></label>
+        <label>Fecha *<input id="activityDate" type="date" required></label>
+        <label>Hora inicio *<input id="activityStart" type="time" required></label>
+        <label>Hora término<input id="activityEnd" type="time"></label>
+        <label>Estado<select id="activityStatus"><option value="open">Abierta</option><option value="closed">Cerrada</option></select></label>
+        <label class="span-2">Descripción<textarea id="activityDescription" rows="2"></textarea></label>
+        <label>Texto institucional / bajada<textarea id="activityTagline" rows="2"></textarea></label>
+        <label>Logotipo institucional<input id="activityLogo" type="file" accept="image/*"></label>
+        <label>Logotipo del proyecto<input id="projectLogo" type="file" accept="image/*"></label>
+        <label>Logotipo aliado<input id="partnerLogo" type="file" accept="image/*"></label>
+        <div class="form-actions span-2"><button class="primary" type="submit">Guardar actividad</button><button class="secondary" id="clearActivity" type="button">Limpiar</button></div>
+      </form><p id="activityMessage" class="message" role="status"></p>
     </div>
-  </main>
-  <div id="qrDownloadStage" class="qr-download-stage" aria-hidden="true"></div>
-  <script src="app.js"></script>
-</body>
-</html>
+    <div class="panel"><h2>Listado</h2><div id="activitiesTable" class="table-wrap"></div></div>
+  </section>
+  <section id="tab-registrations" class="tab-panel hidden">
+    <div class="page-head"><div><h1>Inscripciones</h1><p class="muted">Registro individual o importación CSV con revisión previa.</p></div></div>
+    <div class="panel"><h2>Registrar persona</h2>
+      <form id="registrationForm" class="form-grid">
+        <label class="span-2">Actividad *<select id="registrationActivity" required></select></label>
+        <label>Nombre completo *<input id="registrationName" required maxlength="180"></label>
+        <label>Correo electrónico<input id="registrationEmail" type="email" maxlength="254"></label>
+        <label>Organización<input id="registrationOrg" maxlength="180"></label>
+        <div class="form-actions span-2"><button class="primary" type="submit">Guardar inscripción y generar QR</button></div>
+      </form><p id="registrationMessage" class="message" role="status"></p>
+    </div>
+    <div class="panel"><h2>Importar CSV</h2><p class="muted">Columnas aceptadas: <code>nombre</code>, <code>email</code>, <code>organizacion</code>. UTF-8; la primera fila debe contener encabezados.</p>
+      <div class="form-grid"><label class="span-2">Actividad *<select id="csvActivity"></select></label><label class="span-2">Archivo CSV<input id="csvFile" type="file" accept=".csv,text/csv"></label></div>
+      <div id="csvPreview" class="table-wrap"></div><div class="form-actions"><button id="importCsvBtn" class="primary" disabled>Importar filas válidas</button></div><p id="csvMessage" class="message" role="status"></p>
+    </div>
+    <div class="panel"><h2>Personas inscritas</h2><div class="form-grid"><label class="span-2">Filtrar por actividad<select id="registrationFilter"></select></label></div><div id="registrationsTable" class="table-wrap"></div></div>
+  </section>
+  <section id="tab-tickets" class="tab-panel hidden">
+    <div class="page-head"><div><h1>Entradas PDF/ZIP</h1><p class="muted">El diseño de la entrada se basa en la plantilla proporcionada.</p></div></div>
+    <div class="panel"><div class="form-grid"><label class="span-2">Actividad<select id="ticketActivity"></select></label><label class="span-2">Persona inscrita<select id="ticketRegistration"></select></label></div>
+      <div class="form-actions"><button id="downloadOneBtn" class="primary">Descargar entrada PDF</button><button id="downloadZipBtn" class="secondary">Descargar todas las entradas (ZIP)</button></div><p id="ticketMessage" class="message" role="status"></p>
+    </div>
+    <div class="panel"><h2>Vista previa</h2><div id="ticketPreview" class="ticket-preview"></div></div>
+  </section>
+  <section id="tab-checkin" class="tab-panel hidden">
+    <div class="page-head"><div><h1>Acreditación QR</h1><p class="muted">Requiere conexión a internet para validar cada entrada contra Supabase.</p></div></div>
+    <div class="panel"><label>Actividad<select id="checkinActivity"></select></label><div class="form-actions"><button id="startScannerBtn" class="primary">Activar cámara</button><button id="stopScannerBtn" class="secondary" disabled>Detener cámara</button></div><div id="qrReader"></div>
+      <div class="divider"></div><form id="manualCheckinForm" class="form-grid"><label class="span-2">Código de entrada (alternativa manual)<input id="manualToken" autocomplete="off" placeholder="Pegar token del QR"></label><div class="form-actions span-2"><button class="primary" type="submit">Validar y acreditar</button></div></form>
+      <div id="checkinResult" class="checkin-result" role="status" aria-live="polite"></div>
+    </div><div class="panel"><h2>Últimas acreditaciones</h2><div id="checkinTable" class="table-wrap"></div></div>
+  </section>
+  <section id="tab-admin" class="tab-panel hidden">
+    <div class="page-head"><div><h1>Administración</h1><p class="muted">Gestión de roles. Solo administradores.</p></div></div>
+    <div class="panel"><h2>Usuarios registrados</h2><p class="muted">Crea usuarios desde Supabase Authentication. Luego asigna aquí el rol de personal o administrador.</p><div id="usersTable" class="table-wrap"></div></div>
+    <div class="panel"><h2>Notas de seguridad</h2><ul><li>Usa solo la clave pública/anon de Supabase en el navegador.</li><li>Las políticas RLS del esquema limitan los datos a usuarios autenticados y el check-in usa una función transaccional.</li><li>Activa MFA en las cuentas administrativas cuando esté disponible para tu proyecto.</li></ul></div>
+  </section>
+</section>
+</main>
+<div id="pdfStage" aria-hidden="true"></div>
+<script type="module" src="./src/app.js"></script>
+</body></html>

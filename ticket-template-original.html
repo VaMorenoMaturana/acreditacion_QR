@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espacio Acredita | Editor de entradas</title>
+<style>
+:root{--purple:#35105c;--ink:#17151c;--white:#fffdf8;--teal:#48b5ac;--blue:#668ba6;--paper:#fffdf8}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:#ecebf0;color:#201c25;font-family:Arial,Helvetica,sans-serif}
+button,input,textarea{font:inherit}
+.topbar{background:#21172b;color:white;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{font-weight:800;letter-spacing:.03em}.brand small{display:block;font-size:12px;font-weight:400;opacity:.8;margin-top:4px}
+main{max-width:1240px;margin:24px auto;padding:0 16px}
+.layout{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:22px;align-items:start}
+.panel{background:#fff;border:1px solid #ded9e4;border-radius:14px;padding:20px;box-shadow:0 5px 20px #23132a0a}
+h1{font-size:22px;margin:0 0 8px}h2{font-size:16px;margin:0 0 14px}
+.intro{color:#665e6c;font-size:13px;line-height:1.5;margin:0 0 20px}
+.section{border-top:1px solid #eee9f1;padding-top:17px;margin-top:17px}
+.field{display:flex;flex-direction:column;gap:6px;margin:0 0 12px}
+label{font-size:12px;font-weight:700;color:#4b4352}
+input,textarea{width:100%;border:1px solid #d8d1de;border-radius:8px;padding:10px 11px;background:#fff;color:#201c25;min-width:0}
+textarea{min-height:74px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{border:0;border-radius:8px;padding:11px 14px;font-weight:700;cursor:pointer}
+.primary{background:var(--purple);color:#fff}.secondary{background:#f0ebf4;color:#35105c;border:1px solid #ddd1e8}.full{width:100%}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.note{font-size:12px;color:#6c6471;line-height:1.5}
+.preview-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.preview-head h2{margin:0}.status{font-size:11px;background:#e4f4ef;color:#176c59;border-radius:99px;padding:6px 9px}
+.ticket-wrap{background:transparent;border-radius:0;padding:0;overflow:auto}
+
+.ticket{position:relative;width:100%;max-width:1600px;aspect-ratio:2000/647;margin:0 auto;overflow:hidden;color:#fffdf8;background:linear-gradient(105deg,#5c7e9c 0%,#3c7894 24%,#4ab7ad 56%,#3c9b9d 100%);border-radius:0;box-shadow:0 8px 24px #1c102a25;display:block;isolation:isolate;container-type:inline-size;font-family:Georgia,"Times New Roman",serif}
+.ticket:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 8% 100%,#4d245e99,transparent 36%),linear-gradient(90deg,#fff0 0 79.8%,#fff1 79.8% 100%);z-index:-1}
+.ticket:after{content:"";position:absolute;left:80.25%;top:0;height:100%;border-left:4px dotted #fff;z-index:2}
+.ticket-main{position:absolute;left:21.5%;top:8.5%;width:57%;height:50%;padding:0 0 1%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:2.5%;text-align:center;min-width:0}
+.kicker{font-size:clamp(8px,1cqw,14px);font-weight:700;letter-spacing:.13em;text-transform:uppercase;opacity:.95}
+.person{font-family:Arial,sans-serif;font-weight:700;font-size:clamp(12px,1.6cqw,26px);letter-spacing:.025em;color:#fff;line-height:1.2;max-width:100%;overflow-wrap:anywhere}
+.thanks{font-variant:small-caps;font-size:clamp(14px,2cqw,33px);line-height:1.3;letter-spacing:.025em}
+.event-name{font-size:clamp(19px,2.55cqw,42px);line-height:1.2;font-weight:bold;letter-spacing:0;margin:0;color:#35105c;overflow-wrap:anywhere;text-transform:uppercase}
+.event-desc{font-variant:small-caps;font-size:clamp(12px,1.55cqw,25px);letter-spacing:.025em;line-height:1.25;opacity:.98;max-width:100%;white-space:normal}
+.event-meta-shadow{position:absolute;left:calc(23.2% + 10px);bottom:calc(7% - 9px);width:calc(49% - 2px);height:calc(25% - 2px);border-radius:100px;background:#4c286d;z-index:0;pointer-events:none}
+.event-meta{position:absolute;left:23.2%;bottom:7%;width:49%;height:25%;border:2px solid #14121a;border-radius:100px;background:#f2f0f2;color:#111;display:flex;align-items:center;justify-content:space-evenly;padding:1.1% 1.6%;gap:1%;z-index:1}
+.detail{display:flex;align-items:center;gap:clamp(3px,.5cqw,8px);min-width:0}
+.detail img{width:clamp(20px,4.2cqw,66px);height:auto;flex:none}
+.detail b{display:block;font-variant:small-caps;font-size:clamp(10px,1.45cqw,24px);white-space:nowrap}
+.detail span{display:block;font-variant:small-caps;font-size:clamp(9px,1.3cqw,22px);white-space:nowrap}
+.org{font-size:clamp(8px,.9cqw,14px);opacity:.85;margin-top:3px}
+.asset-slot{position:absolute;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;text-align:center;font:600 clamp(7px,.7cqw,12px)/1.2 Arial,sans-serif;cursor:pointer}
+.asset-slot img{width:100%;height:100%;object-fit:contain;display:block}
+.asset-slot .placeholder{border:1px dashed #ffffff66;background:#18253b12;padding:4px;width:100%;height:100%;display:flex;align-items:center;justify-content:center;opacity:.65}
+.asset-slot input{display:none}
+.asset-slot:has(img:not([hidden])) .placeholder{display:none}
+.asset-slot:has(img:not([hidden])){background:transparent}
+.logo-em{left:11.1%;top:15%;width:8.4%;height:15%}
+.logo-project{left:11.1%;top:37%;width:8.8%;height:27%}
+.logo-partner{left:11.1%;top:73%;width:8.8%;height:10%}
+.left-rail{position:absolute;left:3.9%;top:6.5%;height:87%;width:4.4%;border:2px solid #fff;border-radius:50px;display:flex;align-items:center;justify-content:center}
+.left-rail span{display:block;white-space:nowrap;transform:rotate(-90deg);font-size:clamp(8px,1.45cqw,25px);letter-spacing:.03em}
+.stub{position:absolute;left:81%;top:7%;width:17.5%;height:86%;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:space-around;padding:1% 0}
+.admit{font-weight:bold;font-size:clamp(17px,2cqw,34px);letter-spacing:.02em;margin:.6cqw 0}
+.seat{font-variant:small-caps;font-size:clamp(14px,1.6cqw,27px);line-height:1.35;margin:.6cqw 0}
+.qr-image{width:63%;max-width:180px;height:auto;aspect-ratio:1;border:4px solid #35105c;border-radius:20px;padding:4px;background:#fff;object-fit:contain;flex:none;margin:.6cqw 0}
+#logoPreview,#projectLogoPreview,#partnerLogoPreview{display:none}
+.hidden{display:none!important}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.ticket{min-width:720px}.ticket-wrap{overflow-x:auto}}
+@media(max-width:650px){
+ .ticket-main{left:21%;width:58%;top:7%;height:52%;gap:2%}
+ .person{font-size:clamp(9px,1.6cqw,15px)}
+ .thanks{font-size:clamp(10px,2cqw,19px)}
+ .event-name{font-size:clamp(12px,2.55cqw,23px)}
+ .event-desc{font-size:clamp(8px,1.55cqw,15px)}
+ .stub .qr-image{width:clamp(140px,9cqw,180px);max-width:none;border-width:4px;padding:4px;border-radius:10%}
+ .event-meta{left:21%;width:51%;gap:1%;padding:1%}
+ .detail{gap:3px}.detail img{width:clamp(12px,3cqw,22px)}
+ .detail b{font-size:clamp(7px,1.45cqw,11px)}
+ .detail span{font-size:clamp(7px,1.3cqw,10px)}
+ .logo-em{left:10.8%;width:8.8%}.logo-project,.logo-partner{left:10.8%;width:9.2%}
+}
+@media print{
+ @page{size:303mm 102.0795mm;margin:3mm}
+ body{background:#fff}
+ .topbar,main .panel,.preview-head,.no-print{display:none!important}
+ main{margin:0;padding:0;max-width:none}
+ .layout{display:block}
+ .ticket-wrap{background:#fff;border-radius:0;padding:0;overflow:visible}
+ .ticket{width:297mm;height:96.0795mm;max-width:none;aspect-ratio:auto;margin:0;border-radius:0;box-shadow:none;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">ESPACIO ACREDITA <small>Registro y acreditación de actividades · Fundación Espacio Mejor</small></div>
+  <div class="note" style="color:#eee8f3">Prototipo de plantilla de entrada</div>
+</header>
+<main>
+<div class="layout">
+  <section class="panel no-print">
+    <h1>Configurar entrada</h1>
+    <p class="intro">Complete los datos de la actividad y del asistente. La vista previa se actualizará automáticamente. El PDF contendrá solamente la entrada.</p>
+    <form id="ticketForm">
+      <h2>Datos de la actividad</h2>
+      <div class="field"><label for="eventName">Nombre de la actividad *</label><input id="eventName" required value="Liderazgo en 100 Palabras"></div>
+      <div class="field"><label for="eventDesc">Información de la actividad</label><textarea id="eventDesc">“VISIBILIZANDO EL LIDERAZGO QUE TRANSFORMA IBEROAMÉRICA”</textarea></div>
+      <div class="field"><label for="eventPlace">Lugar *</label><input id="eventPlace" required value="Valparaíso, Chile"></div>
+      <div class="two">
+        <div class="field"><label for="eventDate">Fecha *</label><input id="eventDate" required type="date"></div>
+        <div class="field"><label for="eventStart">Hora de inicio *</label><input id="eventStart" required type="time" value="18:00"></div>
+      </div>
+      <div class="field"><label for="eventEnd">Hora de término</label><input id="eventEnd" type="time" value="21:30"></div>
+      <div class="field"><label for="eventLogo">Logotipo institucional (opcional)</label><input id="eventLogo" type="file" accept="image/*"></div>
+      <div class="field"><label for="projectLogoFile">Logotipo del proyecto (opcional)</label><input id="projectLogoFile" type="file" accept="image/*"></div>
+      <div class="field"><label for="partnerLogoFile">Logotipo aliado (opcional)</label><input id="partnerLogoFile" type="file" accept="image/*"></div>
+      <div class="section">
+        <h2>Datos de la persona</h2>
+        <div class="field"><label for="personName">Nombre completo *</label><input id="personName" required value="Nombre del asistente"></div>
+        <div class="field"><label for="personEmail">Correo electrónico</label><input id="personEmail" type="email" placeholder="persona@ejemplo.cl"></div>
+        <div class="field"><label for="personOrg">Organización</label><input id="personOrg" placeholder="Organización (opcional)"></div>
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" id="generateBtn">Crear entrada</button>
+        <button class="secondary" type="button" id="pdfBtn">Descargar PDF</button>
+      </div>
+      <p class="note" style="margin-top:12px">El QR de esta plantilla usa un identificador aleatorio de demostración. Para validar ingresos reales, deberá conectarse al registro de Espacio Acredita en Supabase.</p>
+    </form>
+  </section>
+  <section>
+    <div class="preview-head no-print"><h2>Vista previa de la entrada</h2><span class="status" id="stateLabel">Vista previa</span></div>
+    <div class="ticket-wrap" id="ticketWrap">
+      <article class="ticket" id="ticket">
+        <div class="left-rail"><span id="previewWeb">WWW.ESPACIOMEJOR.ORG</span></div>
+        <label class="asset-slot logo-em" title="Adjuntar logo institucional">
+          <input type="file" accept="image/*" aria-label="Adjuntar logo institucional">
+          <span class="placeholder">+ Adjuntar logo</span><img id="logoPreview" alt="Logotipo institucional" hidden>
+        </label>
+        <label class="asset-slot logo-project" title="Adjuntar logo del proyecto">
+          <input type="file" accept="image/*" aria-label="Adjuntar logo del proyecto">
+          <span class="placeholder">+ Logo del proyecto</span><img id="projectLogoPreview" alt="Logo del proyecto" hidden>
+        </label>
+        <label class="asset-slot logo-partner" title="Adjuntar logo aliado">
+          <input type="file" accept="image/*" aria-label="Adjuntar logo aliado">
+          <span class="placeholder">+ Logo aliado</span><img id="partnerLogoPreview" alt="Logo aliado" hidden>
+        </label>
+        <div class="ticket-main">
+          <div>
+            <div class="person" id="previewPerson">Nombre del asistente</div>
+            <div class="org" id="previewOrg"></div>
+          </div>
+          <div class="thanks" id="previewGreeting">Gracias por acompañarnos en la<br>ceremonia de premiación del proyecto</div>
+          <div class="event-name" id="previewEventName">Liderazgo en 100 Palabras</div>
+          <div class="event-desc" id="previewEventDesc">“VISIBILIZANDO EL LIDERAZGO QUE TRANSFORMA IBEROAMÉRICA”</div>
+        </div>
+        <div class="event-meta-shadow" aria-hidden="true"></div>
+        <div class="event-meta">
+          <div class="detail">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIiBzdHJva2U9IiMxMTEiIHN0cm9rZS13aWR0aD0iMiI+PHJlY3QgeD0iNSIgeT0iOSIgd2lkdGg9IjUxIiBoZWlnaHQ9IjQ5IiByeD0iNSIvPjxwYXRoIGQ9Ik0xNiA0djEzTTQ0IDR2MTNNNSAyMmg1MU0xOSAzOGw4IDggMTctMTgiLz48L3N2Zz4=" alt="" aria-hidden="true">
+            <div><b>Fecha:</b><span id="previewDate">Por definir</span></div>
+          </div>
+          <div class="detail">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIiBzdHJva2U9IiMxMTEiIHN0cm9rZS13aWR0aD0iMiI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjciLz48cGF0aCBkPSJNMzIgOXYyNEwxNSA0MyIvPjwvc3ZnPg==" alt="" aria-hidden="true">
+            <div><b>Horario:</b><span id="previewTime">18:00–21:30</span></div>
+          </div>
+          <div class="detail">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIiBzdHJva2U9IiMxMTEiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTMyIDYwUzkgMzIgOSAyM2EyMyAyMyAwIDAgMSA0NiAwQzU1IDMyIDMyIDYwIDMyIDYwWiIvPjxjaXJjbGUgY3g9IjMyIiBjeT0iMjMiIHI9IjkiLz48L3N2Zz4=" alt="" aria-hidden="true">
+            <div><b>Lugar:</b><span id="previewPlace">Valparaíso, Chile</span></div>
+          </div>
+        </div>
+        <aside class="stub">
+          <div class="admit">ADMITE UNO</div>
+          <div class="seat"><div>FILA: 10</div><div>ASIENTO: 8</div></div>
+          <img class="qr-image" id="qrPreview" alt="Código QR de la entrada">
+        </aside>
+      </article>
+    </div>
+    <p class="note no-print" style="margin:12px 4px">Sugerencia: antes de usarlo en producción, conectar este formulario con la base de datos, para que cada entrada corresponda a una inscripción guardada y el QR pueda validarse durante la acreditación.</p>
+  </section>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let token = newToken();
+let qrDataUrl = "";
+function newToken(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replaceAll("-","").slice(0,12).toUpperCase();
+  return "EA" + Math.random().toString(36).slice(2,12).toUpperCase();
+}
+function formattedDate(value){
+  if(!value) return "Por definir";
+  const d = new Date(value+"T12:00:00");
+  const month=new Intl.DateTimeFormat("es-CL",{month:"short"}).format(d).replace(/\.$/,"");
+  return `${d.getDate()} de ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
+}
+function text(id, value, fallback="—"){ $(id).textContent = value.trim() || fallback; }
+function updatePreview(){
+  text("previewEventName",$("eventName").value,"Nombre de la actividad");
+  text("previewEventDesc",$("eventDesc").value,"");
+  text("previewPlace",$("eventPlace").value,"Lugar por confirmar");
+  text("previewDate",formattedDate($("eventDate").value));
+  const start=$("eventStart").value, end=$("eventEnd").value;
+  text("previewTime",start ? start+(end?"–"+end:"") : "Por definir");
+  text("previewPerson",$("personName").value,"Nombre del asistente");
+  text("previewOrg",$("personOrg").value,"");
+}
+function makeQr(){
+  const payload = "ESPACIO-ACREDITA-DEMO:"+token;
+  const holder=document.createElement("div");
+  new QRCode(holder,{text:payload,width:320,height:320,colorDark:"#17151c",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+  const canvas=holder.querySelector("canvas");
+  const img=holder.querySelector("img");
+  if(canvas) qrDataUrl=canvas.toDataURL("image/png");
+  else if(img) qrDataUrl=img.src;
+  if(qrDataUrl) $("qrPreview").src=qrDataUrl;
+}
+function createTicket(){
+  if(!$("eventName").value.trim()||!$("eventPlace").value.trim()||!$("eventDate").value||!$("eventStart").value||!$("personName").value.trim()){
+    alert("Complete los campos obligatorios: actividad, lugar, fecha, hora de inicio y nombre completo.");
+    return false;
+  }
+  updatePreview();
+  makeQr();
+  $("stateLabel").textContent="Entrada preparada";
+  return true;
+}
+document.querySelectorAll("#ticketForm input:not([type=file]), #ticketForm textarea").forEach(el=>el.addEventListener("input",updatePreview));
+$("generateBtn").addEventListener("click",()=>{if(createTicket()) alert("Entrada preparada. Puede descargar el PDF.");});
+$("pdfBtn").addEventListener("click",async()=>{
+  if(!createTicket()) return;
+  if(typeof html2pdf==="undefined"){alert("No se pudo cargar el generador de PDF. Revise su conexión a internet o use Imprimir > Guardar como PDF.");return;}
+  $("pdfBtn").disabled=true;
+  $("pdfBtn").textContent="Generando PDF…";
+  const ticket=$("ticket");
+  ticket.scrollIntoView({block:"center",inline:"nearest"});
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  const ticketBounds=ticket.getBoundingClientRect();
+  const pageWidth=297;
+  const safeMargin=3;
+  const contentHeight=pageWidth*ticketBounds.height/ticketBounds.width;
+  const pageHeight=contentHeight+safeMargin*2+2;
+  try{
+    const pdfWorker=html2pdf().set({
+      margin:safeMargin,
+      image:{type:"jpeg",quality:0.98},
+      html2canvas:{
+        scale:Math.max(2,Math.min(4,2400/ticketBounds.width)),
+        useCORS:true,
+        backgroundColor:null
+      },
+      jsPDF:{unit:"mm",format:[pageWidth+safeMargin*2,pageHeight],orientation:"landscape"}
+    }).from(ticket);
+    await pdfWorker.toPdf();
+    const captureCanvas=pdfWorker.prop.canvas;
+    if(!captureCanvas||!captureCanvas.width||!captureCanvas.height){
+      throw new Error("No se pudo capturar la entrada para el PDF.");
+    }
+    const context=captureCanvas.getContext("2d");
+    const hasTicketPixels=[[0.05,0.5],[0.5,0.5],[0.95,0.5]].some(([x,y])=>{
+      const pixel=context.getImageData(Math.floor(captureCanvas.width*x),Math.floor(captureCanvas.height*y),1,1).data;
+      return pixel[0]<245||pixel[1]<245||pixel[2]<245;
+    });
+    if(!hasTicketPixels) throw new Error("La captura quedó en blanco. Intente descargar el PDF nuevamente.");
+    pdfWorker.prop.pdf.save("entrada-"+token+".pdf");
+  }catch(e){
+    console.error("Error al generar el PDF de la entrada:",e);
+    alert(`No fue posible generar el PDF: ${e.message||e}. Puede usar Imprimir / Guardar como PDF desde el navegador.`);
+  }finally{
+    $("pdfBtn").disabled=false;
+    $("pdfBtn").textContent="Descargar PDF";
+  }
+});
+function setLogoFromFile(input,imageId){
+  const file=input.files&&input.files[0];if(!file)return;
+  if(!file.type.startsWith("image/")){alert("Seleccione un archivo de imagen.");return;}
+  const reader=new FileReader();
+  reader.onload=()=>{$(imageId).src=reader.result;$(imageId).style.display="block";$(imageId).hidden=false;};
+  reader.readAsDataURL(file);
+}
+$("eventLogo").addEventListener("change",ev=>{
+  const file=ev.target.files&&ev.target.files[0];if(!file)return;
+  setLogoFromFile(ev.target,"logoPreview");
+});
+$("projectLogoFile").addEventListener("change",ev=>setLogoFromFile(ev.target,"projectLogoPreview"));
+$("partnerLogoFile").addEventListener("change",ev=>setLogoFromFile(ev.target,"partnerLogoPreview"));
+document.querySelector(".logo-em input").addEventListener("change",ev=>setLogoFromFile(ev.target,"logoPreview"));
+document.querySelector(".logo-project input").addEventListener("change",ev=>setLogoFromFile(ev.target,"projectLogoPreview"));
+document.querySelector(".logo-partner input").addEventListener("change",ev=>setLogoFromFile(ev.target,"partnerLogoPreview"));
+$("eventDate").value=new Date().toISOString().slice(0,10);
+updatePreview();makeQr();
+</script>
+</body>
+</html>

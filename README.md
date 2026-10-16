@@ -1,108 +1,71 @@
-# Liderazgo en 100 Palabras — acreditación QR
+# Espacio Acredita — versión inicial (v0.1)
 
-Aplicación web estática para Render Static Site con autenticación y base de datos gestionadas por Supabase. Incluye perfil administrador, perfil de equipo, creación/descarga de QR, validación y registro de ingreso con prevención de doble check-in, y panel con estadísticas que se actualizan en tiempo real.
+Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditación QR. La plantilla visual del ticket se toma del HTML entregado y se conserva como referencia de diseño.
 
-## Arquitectura y límites importantes
+## Incluye
+- Inicio de sesión Supabase Auth.
+- Actividades con fecha, lugar, horario, descripción y logotipos.
+- Inscripción individual.
+- Importación CSV con vista previa, validación básica y reporte de filas inválidas.
+- Entradas PDF individuales y ZIP por actividad.
+- Acreditación por cámara (requiere HTTPS y permiso de cámara) o token manual.
+- Roles `staff` y `admin` en Supabase.
+- Registro de acreditaciones y operaciones básicas en `audit_logs`.
 
-- **Render Static Site** sirve la interfaz; no ejecuta una base de datos ni autentica usuarios por sí solo.
-- **Supabase Auth + PostgreSQL + Realtime** proporciona autenticación, almacenamiento y sincronización.
-- El QR contiene un token aleatorio (`L100P:<UUID>`), no nombre, correo ni otros datos personales.
-- El personal no tiene acceso directo a la tabla de asistentes. La función SQL valida y registra el ingreso de forma transaccional.
-- No se usa ni se debe publicar una clave `service_role` en el navegador.
-- El acceso a la cámara requiere HTTPS (Render lo ofrece en el dominio publicado) y permiso del usuario.
-
-## Archivos
-
-- `index.html`: interfaz.
-- `styles.css`: estilos adaptables a móvil.
-- `app.js`: autenticación, lector QR, generación/descarga y panel.
-- `supabase/schema.sql`: tablas, políticas RLS y función segura de check-in.
-- `render.yaml`: configuración inicial para Render.
+## Arquitectura
+- Frontend estático: Render Static Site.
+- Autenticación y base de datos: Supabase.
+- Bibliotecas de navegador por CDN para QR, PDF, ZIP y lector QR.
+- No contiene claves secretas. La configuración del navegador usa únicamente URL y clave pública de Supabase.
 
 ## Puesta en marcha
-
-### 1. Crear Supabase
-
-1. Crea un proyecto en Supabase.
-2. Abre **SQL Editor** y ejecuta el contenido de `supabase/schema.sql`.
-3. En **Project Settings → API** copia `Project URL` y la clave pública `anon`/publishable.
-4. En `app.js`, reemplaza:
-   - `PEGA_AQUI_TU_SUPABASE_URL`
-   - `PEGA_AQUI_TU_SUPABASE_ANON_KEY`
-
-   La clave pública/anon está diseñada para uso en el navegador cuando RLS está correctamente configurado. **No pegues la clave `service_role`**.
-5. En **Authentication → Providers**, confirma que Email esté habilitado. Recomendación: desactiva el registro público de usuarios; el equipo debe ser invitado/creado por el administrador.
-6. En **Authentication → Users**, crea manualmente las cuentas para el Director y el equipo. Usa contraseñas únicas y fuertes; habilita MFA para el perfil administrador si la configuración del proyecto lo permite.
-7. Para cada usuario, copia su UUID desde Authentication → Users y ejecuta una sentencia como esta en SQL Editor:
+1. Crea un proyecto Supabase para este sistema.
+2. En Supabase SQL Editor, revisa y ejecuta `supabase/schema.sql`. Si la base ya contiene tablas, no ejecutes sin revisar conflictos y tener respaldo.
+3. En Authentication, crea la primera cuenta de usuario.
+4. Asigna rol administrador ejecutando, en una consulta separada, por ejemplo:
    ```sql
-   insert into public.user_profiles (id, display_name, role)
-   values ('UUID_REAL_DEL_USUARIO', 'Director de Datos', 'admin');
+   update public.profiles set role='admin' where email='correo-institucional@ejemplo.cl';
    ```
-   Para cada integrante del equipo usa `role = 'staff'`. **No compartas la cuenta del administrador.**
-8. En **Database → Replication** o la sección Realtime, confirma que la tabla `public.attendees` esté habilitada para cambios en tiempo real. El SQL intenta agregarla a `supabase_realtime`.
+   Sustituye el correo de ejemplo por el correo real autorizado. No compartas credenciales.
+5. Copia URL del proyecto y la clave pública anon/publishable a `src/config.js`.
+6. Publica el contenido de esta carpeta como Static Site en Render. Build command vacío; Publish directory `.`.
+7. Accede con la cuenta creada. Crea una actividad de prueba y registra asistentes ficticios antes de usar datos reales.
 
-### 2. Publicar en Render
+## Plantilla del ticket
+- `ticket-template-original.html` es el archivo original adjunto, preservado sin modificaciones.
+- `src/ticket-template.js` deriva el CSS y el markup del ticket para generar PDF dentro de la aplicación.
+- Los campos se rellenan desde la actividad y la inscripción. El QR contiene un token aleatorio UUID de la base de datos, no nombre, correo ni otros datos personales.
+- La versión de la plantilla original puede incluir un QR de demostración. No uses ese QR para acreditar asistentes reales.
 
-1. Sube esta carpeta a un repositorio privado de GitHub.
-2. En Render elige **New → Static Site** y conecta el repositorio.
-3. Build command: dejar vacío (o `echo "Static site"` si la interfaz exige un comando).
-4. Publish directory: `.`.
-5. Publica. La cámara solo funcionará en HTTPS.
-6. Prueba el acceso con una cuenta `staff` y otra `admin`.
+## CSV
+Encabezados recomendados:
+```csv
+nombre,email,organizacion
+Ana Ejemplo,ana@example.cl,Fundación Ejemplo
+Luis Prueba,luis@example.cl,Organización Prueba
+```
+El importador valida campos y duplicados dentro del archivo; la base de datos evita duplicar la misma inscripción para una misma persona. Para producción se recomienda acordar la regla de deduplicación de personas y probar CSV exportados de los sistemas reales.
 
-También puedes usar el `render.yaml` como referencia para crear el Static Site.
+## Límites conocidos de esta versión
+- No se envían correos automáticamente.
+- La acreditación requiere conexión activa a Supabase; no hay modo offline.
+- No incluye registro público, certificados, integraciones externas ni check-out.
+- Los logotipos se almacenan como data URL en registros de actividad; para uso sostenido conviene migrarlos a Supabase Storage con límites de tamaño y permisos.
+- La importación CSV es secuencial y está pensada para lotes pequeños/medianos; probar el volumen real.
+- La auditoría está iniciada, pero no todos los cambios quedan auditados aún.
+- Antes de producción hay que realizar pruebas funcionales, de permisos/RLS, concurrencia de check-in, privacidad, respaldos y recuperación.
 
-## Uso el día de la ceremonia
+## Seguridad y privacidad
+- No poner `service_role`, contraseñas ni tokens secretos en el frontend.
+- Crear cuentas solo para personal autorizado; habilitar MFA para administradores.
+- Usar datos ficticios durante pruebas.
+- Definir aviso de privacidad, base de legitimación, retención y procedimiento de eliminación antes de cargar datos personales reales.
+- La política inicial de perfiles permite que cada usuario vea su propio perfil y que administradores vean todos; el alta automática crea rol `staff`.
+- Las funciones `SECURITY DEFINER` y políticas deben revisarse en un entorno de prueba antes de usar datos reales.
 
-### Antes de la ceremonia
-1. Ingresa con la cuenta `admin`.
-2. Abre **Administración**.
-3. Registra nombre, correo opcional y organización opcional.
-4. Se descargará un PNG por invitado. El panel permite volver a descargarlo.
-
-### En la ceremonia
-1. Cada integrante inicia sesión con su propia cuenta `staff`.
-2. Pulsa **Activar cámara** y apunta al QR.
-3. La app consulta el token contra la base de datos y registra el ingreso una sola vez.
-4. Si el QR ya se usó, la aplicación muestra el nombre y la hora del primer ingreso y no vuelve a registrar otro.
-5. El administrador ve totales, pendientes, porcentaje y estado de cada invitado; la tabla se refresca con Realtime.
-
-## Pruebas mínimas antes de usar datos reales
-
-- Iniciar sesión como administrador y como staff.
-- Crear una invitación de prueba y descargar su QR.
-- Validar un QR correcto: debe registrar un ingreso.
-- Escanearlo por segunda vez: debe mostrar “ya utilizada” y conservar la hora original.
-- Probar un token inventado: debe rechazarse.
-- Comprobar que `staff` no puede consultar directamente la tabla `attendees` desde el cliente.
-- Abrir la web desde un teléfono y comprobar permiso de cámara.
-- Abrir dos sesiones de administración y confirmar que los cambios se reflejan.
-
-## Consideraciones de seguridad y operación
-
-- El QR funciona como una credencial: no publiques ni reenvíes códigos fuera de su destinatario.
-- Si se pierde un QR, esta versión no incluye revocación/reemisión desde la interfaz. Puedes eliminar la invitación desde el panel de Supabase o solicitar esa mejora antes del evento.
-- Esta versión registra el primer ingreso, no salidas ni múltiples accesos.
-- Usa datos ficticios para las pruebas y minimiza el correo almacenado. Establece quién puede acceder a la lista de invitados y cuánto tiempo se conservará.
-- Configura copias de seguridad y revisa las políticas RLS antes de producción.
-- Las bibliotecas de QR se cargan desde CDN; para una ceremonia crítica conviene fijar versiones y probar con antelación.
-- El panel muestra la hora en la zona horaria del navegador del dispositivo.
-
-## Alcance de esta entrega
-
-Es un prototipo funcional de base para un proyecto simple; requiere configurar Supabase y desplegarlo en Render. No se considera una auditoría de seguridad ni una certificación de cumplimiento normativo.
-
-
-## Actualización de funciones (popup, CSV y salidas)
-
-Si ya habías ejecutado una versión anterior de `supabase/schema.sql`, vuelve a ejecutar el archivo actualizado completo en SQL Editor. Incluye `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` para la columna de salida y crea las nuevas funciones RPC. Si Supabase informa de un error, no continúes con datos reales hasta resolverlo.
-
-Novedades:
-- Al escanear, se consulta la invitación y aparece una ventana con nombre, organización, correo y estado. El ingreso solo se registra al pulsar **Ingresar**.
-- Importación CSV (separador coma o punto y coma) con columnas `nombre`, `correo`, `organizacion`. Puedes descargar una plantilla desde Administración.
-- El botón **Descargar QR en ZIP** genera PNG individuales para todos los invitados cargados.
-- El administrador puede eliminar un invitado individual o todos los registros; ambas acciones solicitan confirmación.
-- **Marcar salida** registra cuándo se fue una persona que ya había ingresado. La salida no elimina ni invalida su invitación.
-- El panel sigue mostrando asistencia acumulada; la columna de estado distingue Pendiente, Ingresó y Se fue.
-
-Importación: para evitar duplicados, el sistema agrega nuevos registros y no intenta actualizar existentes. Revisa el CSV antes de importarlo. La importación en bloques puede quedar parcialmente completada si falla un bloque; el mensaje indicará que hubo un error y conviene revisar la tabla antes de reintentar.
+## Despliegue Render
+- New > Static Site.
+- Conectar repositorio con estos archivos.
+- Build command: dejar vacío.
+- Publish directory: `.`
+- Usar HTTPS para habilitar la cámara del dispositivo.
