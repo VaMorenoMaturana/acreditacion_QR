@@ -72,10 +72,12 @@
         <label>Nombre completo *<input id="registrationName" required maxlength="180"></label>
         <label>Correo electrónico<input id="registrationEmail" type="email" maxlength="254"></label>
         <label>Organización<input id="registrationOrg" maxlength="180"></label>
+        <label>Fila<input id="registrationRow" maxlength="40" placeholder="Opcional"></label>
+        <label>Asiento<input id="registrationSeat" maxlength="40" placeholder="Opcional"></label>
         <div class="form-actions span-2"><button class="primary" type="submit">Guardar inscripción y generar QR</button></div>
       </form><p id="registrationMessage" class="message" role="status"></p>
     </div>
-    <div class="panel"><h2>Importar CSV</h2><p class="muted">Columnas aceptadas: <code>nombre</code>, <code>email</code>, <code>organizacion</code>. UTF-8; la primera fila debe contener encabezados.</p>
+    <div class="panel"><h2>Importar CSV</h2><p class="muted">Columnas requeridas: <code>nombre</code>; opcionales: <code>email</code>, <code>organizacion</code>, <code>fila</code>, <code>asiento</code>. UTF-8; la primera fila debe contener encabezados.</p>
       <div class="form-grid"><label class="span-2">Actividad *<select id="csvActivity"></select></label><label class="span-2">Archivo CSV<input id="csvFile" type="file" accept=".csv,text/csv"></label></div>
       <div id="csvPreview" class="table-wrap"></div><div class="form-actions"><button id="importCsvBtn" class="primary" disabled>Importar filas válidas</button></div><p id="csvMessage" class="message" role="status"></p>
     </div>

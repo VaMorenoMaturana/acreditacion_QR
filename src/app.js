@@ -48,7 +48,7 @@ function renderAll(){
 function renderRegistrations(){
   const filter=$("registrationFilter").value;
   const list=registrations.filter(r=>!filter||r.activity_id===filter);
-  $("registrationsTable").innerHTML=table(["Persona","Correo","Organización","Actividad","Estado","Acciones"],list.map(r=>`<tr><td>${escapeHtml(r.attendee.full_name)}</td><td>${escapeHtml(r.attendee.email||"—")}</td><td>${escapeHtml(r.attendee.organization||"—")}</td><td>${escapeHtml(selectedActivity(r.activity_id)?.name||"—")}</td><td>${r.status==="checked_in"?"Acreditada":r.status==="cancelled"?"Cancelada":"Pendiente"}</td><td><button class="secondary" data-ticket="${r.id}">PDF</button><button class="secondary" data-cancel="${r.id}" ${r.status==="cancelled"?"disabled":""}>Cancelar</button></td></tr>`));
+  $("registrationsTable").innerHTML=table(["Persona","Correo","Organización","Fila","Asiento","Actividad","Estado","Acciones"],list.map(r=>`<tr><td>${escapeHtml(r.attendee.full_name)}</td><td>${escapeHtml(r.attendee.email||"—")}</td><td>${escapeHtml(r.attendee.organization||"—")}</td><td>${escapeHtml(r.seat_row||"-")}</td><td>${escapeHtml(r.seat_number||"-")}</td><td>${escapeHtml(selectedActivity(r.activity_id)?.name||"—")}</td><td>${r.status==="checked_in"?"Acreditada":r.status==="cancelled"?"Cancelada":"Pendiente"}</td><td><button class="secondary" data-ticket="${r.id}">PDF</button><button class="secondary" data-cancel="${r.id}" ${r.status==="cancelled"?"disabled":""}>Cancelar</button></td></tr>`));
 }
 function renderTicketRegistrationOptions(){
  const aid=$("ticketActivity").value;
@@ -72,7 +72,7 @@ async function saveActivity(ev){
 }
 async function saveRegistration(ev){
  ev.preventDefault();const activityId=val("registrationActivity");if(!activityId){say("registrationMessage","Primero crea una actividad abierta.",true);return;}
- const {data,error}=await supabase.rpc("register_attendee",{p_activity_id:activityId,p_full_name:val("registrationName"),p_email:val("registrationEmail")||null,p_organization:val("registrationOrg")||null});
+ const {data,error}=await supabase.rpc("register_attendee",{p_activity_id:activityId,p_full_name:val("registrationName"),p_email:val("registrationEmail")||null,p_organization:val("registrationOrg")||null,p_seat_row:val("registrationRow")||null,p_seat_number:val("registrationSeat")||null});
  if(error){say("registrationMessage",error.message,true);return;}
  $("registrationForm").reset();await loadAll();$("ticketActivity").value=activityId;renderTicketRegistrationOptions();if(data?.registration_id)$("ticketRegistration").value=data.registration_id;renderTicketPreview();say("registrationMessage","Inscripción guardada y QR único generado.");
 }
@@ -80,21 +80,21 @@ function parseCsv(text){
  const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(lines.length<2)return {rows:[],error:"El CSV no contiene filas de datos."};
  const parseLine=line=>{const out=[];let cur="",quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'&&line[i+1]==='"'&&quoted){cur+='"';i++;}else if(ch==='"'){quoted=!quoted;}else if(ch===","&&!quoted){out.push(cur.trim());cur="";}else cur+=ch;}out.push(cur.trim());return out;};
  const heads=parseLine(lines[0]).map(h=>h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""));
- const idx={name:heads.findIndex(h=>["nombre","nombre completo","name","full_name"].includes(h)),email:heads.findIndex(h=>["email","correo","correo electronico","e-mail"].includes(h)),org:heads.findIndex(h=>["organizacion","organization","institucion"].includes(h))};
+ const idx={name:heads.findIndex(h=>["nombre","nombre completo","name","full_name"].includes(h)),email:heads.findIndex(h=>["email","correo","correo electronico","e-mail"].includes(h)),org:heads.findIndex(h=>["organizacion","organization","institucion"].includes(h)),row:heads.findIndex(h=>["fila","row"].includes(h)),seat:heads.findIndex(h=>["asiento","seat"].includes(h))};
  if(idx.name<0)return {rows:[],error:"Falta una columna de nombre (nombre o nombre completo)."};
- const rows=lines.slice(1).map((line,i)=>{const cells=parseLine(line),name=cells[idx.name]||"",email=idx.email>=0?(cells[idx.email]||""):"",org=idx.org>=0?(cells[idx.org]||""):"";let error="";if(!name)error="Nombre obligatorio";else if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))error="Correo inválido";return {line:i+2,name,email,org,error,valid:!error};});
+ const rows=lines.slice(1).map((line,i)=>{const cells=parseLine(line),name=cells[idx.name]||"",email=idx.email>=0?(cells[idx.email]||""):"",org=idx.org>=0?(cells[idx.org]||""):"",row=idx.row>=0?(cells[idx.row]||""):"",seat=idx.seat>=0?(cells[idx.seat]||""):"";let error="";if(!name)error="Nombre obligatorio";else if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))error="Correo inválido";else if(row.length>40||seat.length>40)error="Fila y asiento admiten hasta 40 caracteres";return {line:i+2,name,email,org,row,seat,error,valid:!error};});
  return {rows,error:""};
 }
 $("csvFile").addEventListener("change",async ev=>{
  const file=ev.target.files?.[0];csvRows=[];$("importCsvBtn").disabled=true;if(!file)return;
  const result=parseCsv(await file.text());if(result.error){say("csvMessage",result.error,true);$("csvPreview").innerHTML="";return;}
  const seen=new Set();csvRows=result.rows.map(r=>{const key=(r.email||r.name).toLowerCase();if(!r.error&&seen.has(key)){r.error="Duplicado dentro del archivo";r.valid=false;}seen.add(key);return r;});
- $("csvPreview").innerHTML=table(["Fila","Nombre","Correo","Organización","Validación"],csvRows.slice(0,100).map(r=>`<tr><td>${r.line}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.email||"—")}</td><td>${escapeHtml(r.org||"—")}</td><td>${r.valid?'<span class="badge good">Válida</span>':`<span class="badge bad">${escapeHtml(r.error)}</span>`}</td></tr>`));
+ $("csvPreview").innerHTML=table(["Fila CSV","Nombre","Correo","Organización","Fila asignada","Asiento","Validación"],csvRows.slice(0,100).map(r=>`<tr><td>${r.line}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.email||"—")}</td><td>${escapeHtml(r.org||"—")}</td><td>${escapeHtml(r.row||"-")}</td><td>${escapeHtml(r.seat||"-")}</td><td>${r.valid?'<span class="badge good">Válida</span>':`<span class="badge bad">${escapeHtml(r.error)}</span>`}</td></tr>`));
  $("importCsvBtn").disabled=!csvRows.some(r=>r.valid);say("csvMessage",`${csvRows.filter(r=>r.valid).length} válidas; ${csvRows.filter(r=>!r.valid).length} con errores. Se muestran hasta 100 filas.`);
 });
 async function importCsv(){
  const aid=val("csvActivity"),valid=csvRows.filter(r=>r.valid);if(!aid||!valid.length)return;
- let ok=0,failed=[];for(const r of valid){const {error}=await supabase.rpc("register_attendee",{p_activity_id:aid,p_full_name:r.name,p_email:r.email||null,p_organization:r.org||null});if(error)failed.push(`Fila ${r.line}: ${error.message}`);else ok++;}
+ let ok=0,failed=[];for(const r of valid){const {error}=await supabase.rpc("register_attendee",{p_activity_id:aid,p_full_name:r.name,p_email:r.email||null,p_organization:r.org||null,p_seat_row:r.row||null,p_seat_number:r.seat||null});if(error)failed.push(`Fila ${r.line}: ${error.message}`);else ok++;}
  await loadAll();say("csvMessage",`Importadas ${ok} filas.${failed.length?" Errores: "+failed.slice(0,4).join(" | "):""}`,failed.length>0);
 }
 function ticketDocument(reg){
@@ -106,6 +106,9 @@ function ticketDocument(reg){
  set("previewEventName",a.name);set("previewEventDesc",a.tagline||a.description||"");
  const start=ticketTime(a.start_time),end=ticketTime(a.end_time);
  set("previewDate",ticketDateLabel(a.event_date));set("previewTime",start?`${start}${end?"–"+end:""}`:"Por definir");set("previewPlace",a.place);
+ const seatLabels=root.querySelectorAll(".seat div");
+ if(seatLabels[0])seatLabels[0].textContent=`FILA: ${reg.seat_row||"-"}`;
+ if(seatLabels[1])seatLabels[1].textContent=`ASIENTO: ${reg.seat_number||"-"}`;
  const imgs=[["logoPreview",a.institution_logo],["projectLogoPreview",a.project_logo],["partnerLogoPreview",a.partner_logo]];
  imgs.forEach(([id,src])=>{const img=root.querySelector("#"+id);if(src){img.src=src;img.hidden=false;img.style.display="block";}else img.remove();});
  const qr=root.querySelector("#qrPreview");qr.removeAttribute("src");qr.alt="Código QR";

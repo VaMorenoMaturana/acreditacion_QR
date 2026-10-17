@@ -5,7 +5,7 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 ## Incluye
 - Inicio de sesión Supabase Auth.
 - Actividades con fecha, lugar, horario, descripción y logotipos.
-- Inscripción individual.
+- Inscripción individual con fila y asiento opcionales por persona.
 - Importación CSV con vista previa, validación básica y reporte de filas inválidas.
 - Entradas PDF individuales y ZIP por actividad.
 - Acreditación por cámara (requiere HTTPS y permiso de cámara) o token manual.
@@ -20,7 +20,7 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 
 ## Puesta en marcha
 1. Crea un proyecto Supabase para este sistema.
-2. En Supabase SQL Editor, revisa y ejecuta `supabase/schema.sql`. Si la base ya contiene tablas, no ejecutes sin revisar conflictos y tener respaldo.
+2. En un proyecto Supabase nuevo, revisa y ejecuta `supabase/schema.sql`. Si ya tienes una base creada, respáldala y ejecuta `supabase/migrations/20261017000000_add_registration_seats.sql` antes de desplegar esta versión; no vuelvas a ejecutar todo el esquema sobre una base existente sin revisar conflictos.
 3. En Authentication, crea la primera cuenta de usuario.
 4. Asigna rol administrador ejecutando, en una consulta separada, por ejemplo:
    ```sql
@@ -40,9 +40,9 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 ## CSV
 Encabezados recomendados:
 ```csv
-nombre,email,organizacion
-Ana Ejemplo,ana@example.cl,Fundación Ejemplo
-Luis Prueba,luis@example.cl,Organización Prueba
+nombre,email,organizacion,fila,asiento
+Ana Ejemplo,ana@example.cl,Fundación Ejemplo,A,12
+Luis Prueba,luis@example.cl,Organización Prueba,,
 ```
 El importador valida campos y duplicados dentro del archivo; la base de datos evita duplicar la misma inscripción para una misma persona. Para producción se recomienda acordar la regla de deduplicación de personas y probar CSV exportados de los sistemas reales.
 
