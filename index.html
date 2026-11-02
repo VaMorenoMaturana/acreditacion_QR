@@ -79,7 +79,7 @@
     </div>
     <div class="panel"><h2>Importar CSV</h2><p class="muted">Columnas requeridas: <code>nombre</code>; opcionales: <code>email</code>, <code>organizacion</code>, <code>fila</code>, <code>asiento</code>. UTF-8; la primera fila debe contener encabezados.</p>
       <div class="form-grid"><label class="span-2">Actividad *<select id="csvActivity"></select></label><label class="span-2">Archivo CSV<input id="csvFile" type="file" accept=".csv,text/csv"></label></div>
-      <div id="csvPreview" class="table-wrap"></div><div class="form-actions"><button id="importCsvBtn" class="primary" disabled>Importar filas válidas</button></div><p id="csvMessage" class="message" role="status"></p>
+      <div id="csvPreview" class="table-wrap"></div><div class="form-actions"><button id="downloadCsvTemplateBtn" class="secondary" type="button">Descargar formato CSV</button><button id="importCsvBtn" class="primary" disabled>Importar filas válidas</button></div><p id="csvMessage" class="message" role="status"></p>
     </div>
     <div class="panel"><h2>Personas inscritas</h2><div class="form-grid"><label class="span-2">Filtrar por actividad<select id="registrationFilter"></select></label></div><div id="registrationsTable" class="table-wrap"></div></div>
   </section>

@@ -2,6 +2,14 @@
 alter table public.registrations add column if not exists seat_row text check (seat_row is null or length(trim(seat_row)) between 1 and 40);
 alter table public.registrations add column if not exists seat_number text check (seat_number is null or length(trim(seat_number)) between 1 and 40);
 
+-- Some existing projects have a NOT NULL created_by column on attendees that the old function filled in.
+do $$
+begin
+ if exists (select 1 from information_schema.columns where table_schema='public' and table_name='attendees' and column_name='created_by') then
+  alter table public.attendees alter column created_by set default auth.uid();
+ end if;
+end $$;
+
 drop function if exists public.register_attendee(uuid,text,text,text);
 create or replace function public.register_attendee(
  p_activity_id uuid, p_full_name text, p_email text default null, p_organization text default null,
