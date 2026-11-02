@@ -78,7 +78,8 @@ async function saveRegistration(ev){
 }
 function parseCsv(text){
  const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(lines.length<2)return {rows:[],error:"El CSV no contiene filas de datos."};
- const parseLine=line=>{const out=[];let cur="",quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'&&line[i+1]==='"'&&quoted){cur+='"';i++;}else if(ch==='"'){quoted=!quoted;}else if(ch===","&&!quoted){out.push(cur.trim());cur="";}else cur+=ch;}out.push(cur.trim());return out;};
+ const sep=[",",";","\t"].map(c=>[c,lines[0].split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+ const parseLine=line=>{const out=[];let cur="",quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'&&line[i+1]==='"'&&quoted){cur+='"';i++;}else if(ch==='"'){quoted=!quoted;}else if(ch===sep&&!quoted){out.push(cur.trim());cur="";}else cur+=ch;}out.push(cur.trim());return out;};
  const heads=parseLine(lines[0]).map(h=>h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""));
  const idx={name:heads.findIndex(h=>["nombre","nombre completo","name","full_name"].includes(h)),email:heads.findIndex(h=>["email","correo","correo electronico","e-mail"].includes(h)),org:heads.findIndex(h=>["organizacion","organization","institucion"].includes(h)),row:heads.findIndex(h=>["fila","row"].includes(h)),seat:heads.findIndex(h=>["asiento","seat"].includes(h))};
  if(idx.name<0)return {rows:[],error:"Falta una columna de nombre (nombre o nombre completo)."};
