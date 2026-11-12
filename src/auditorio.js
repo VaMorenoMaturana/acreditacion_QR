@@ -1,24 +1,235 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-const $=id=>document.getElementById(id);
-const supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-const rowDefs=[{row:1,left:21,right:0},{row:2,left:21,right:0},{row:3,left:21,right:0},{row:4,left:21,right:0},{row:5,left:21,right:0},{row:6,left:21,right:0},{row:7,left:15,right:9},{row:8,left:14,right:9},{row:9,left:13,right:10},{row:10,left:11,right:10},{row:11,left:9,right:11},{row:12,left:7,right:11}];
-const seats=[];let n=1;rowDefs.forEach(d=>{for(let i=0;i<d.left;i++)seats.push({id:n++,row:d.row,side:d.right?"izquierdo":"único",registrationIds:[]});for(let i=0;i<d.right;i++)seats.push({id:n++,row:d.row,side:"derecho",registrationIds:[]});});
-let activities=[],people=[],selectedId=null,editMode=false,direction="left",activeActivityId=null;
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const personById=id=>people.find(p=>p.id===id);
-const seatForPerson=id=>seats.find(s=>s.registrationIds.includes(id));
-const conflict=s=>s.registrationIds.length>1;
-function renumber(){let id=1;rowDefs.forEach(d=>{const group=seats.filter(s=>s.row===d.row);(direction==="left"?group:[...group].reverse()).forEach(s=>s.id=id++);});}
-function updateMode(){ $("modeBtn").textContent=editMode?"Salir del modo edición":"Activar modo edición";$("modeBtn").classList.toggle("primary",editMode);$("notice").textContent=editMode?"Modo edición: seleccione a una persona y luego un asiento para asignarlo.":"Modo consulta: pase el cursor sobre un asiento para ver su información. Los clics no modifican las asignaciones."; }
-function info(s){const assigned=s.registrationIds.map(personById).filter(Boolean);let msg="Asiento "+s.id+" · Fila "+s.row;if(!assigned.length)msg+=" · Disponible";else if(assigned.length===1)msg+=" · "+assigned[0].name+" · "+(assigned[0].org||"Sin organización");else msg+=" · ⚠ CONFLICTO: "+assigned.map(p=>p.name).join(" / ");$("seatInfo").textContent=msg;}
-function renderPeople(){const q=$("search").value.trim().toLocaleLowerCase("es");const list=people.filter(p=>(p.name+" "+p.org).toLocaleLowerCase("es").includes(q));$("counts").textContent=people.length+" inscritos · "+people.filter(p=>seatForPerson(p.id)).length+" con asiento";$("peopleList").innerHTML=list.length?list.map(p=>{const s=seatForPerson(p.id),bad=s&&conflict(s);return `<div class="person ${p.id===selectedId?"active":""} ${s?"assigned":""} ${bad?"conflict":""}" data-person="${p.id}">${bad?'<span class="seat-tag" style="color:#a84e00">⚠ Conflicto</span>':s?'<span class="seat-tag">Fila '+s.row+' · As. '+s.id+'</span>':""}<div class="name">${esc(p.name)}</div><div class="org">${esc(p.org||"Sin organización")}</div></div>`;}).join(""):'<div class="empty">No hay inscritos en esta actividad.</div>';document.querySelectorAll("[data-person]").forEach(el=>el.addEventListener("click",()=>{selectedId=el.dataset.person;renderAll();}));$("unassignBtn").disabled=!selectedId||!seatForPerson(selectedId);}
-function makeSeat(s){const b=document.createElement("button");b.type="button";b.className="seat";const assigned=s.registrationIds.map(personById).filter(Boolean);b.innerHTML=conflict(s)?'<span class="conflict-mark">⚠</span>'+s.id:String(s.id);if(assigned.length)b.classList.add(conflict(s)?"conflict":"assigned");if(selectedId&&s.registrationIds.includes(selectedId))b.classList.add("selected");b.title="Asiento "+s.id+" · Fila "+s.row+(assigned.length?" · "+assigned.map(p=>p.name).join(", "):" · Disponible");b.addEventListener("mouseenter",()=>info(s));b.addEventListener("focus",()=>info(s));b.addEventListener("click",async()=>{if(!editMode){info(s);return;}if(!selectedId){alert("Primero seleccione una persona.");return;}if(s.registrationIds.includes(selectedId))return;if(s.registrationIds.length){if(!confirm("Este asiento ya tiene una persona asignada. ¿Registrar también a la persona seleccionada y marcar el conflicto?"))return;s.registrationIds.push(selectedId);await saveSeat(s);}else{const old=seatForPerson(selectedId);if(old){old.registrationIds=old.registrationIds.filter(id=>id!==selectedId);await saveSeat(old);}s.registrationIds.push(selectedId);await saveSeat(s);}renderAll();});return b;}
-function renderMap(){const host=$("seatMap");host.innerHTML="";rowDefs.forEach(d=>{const line=document.createElement("div");line.className="rowline";const label=document.createElement("div");label.className="rowlabel";label.textContent="FILA "+d.row;line.append(label);const row=seats.filter(s=>s.row===d.row);if(d.right){const left=document.createElement("div");left.className="side";row.filter(s=>s.side==="izquierdo").forEach(s=>left.append(makeSeat(s)));const aisle=document.createElement("div");aisle.className="aisle";aisle.textContent="PASILLO";const right=document.createElement("div");right.className="side";row.filter(s=>s.side==="derecho").forEach(s=>right.append(makeSeat(s)));const split=document.createElement("div");split.className="split";split.append(left,aisle,right);line.append(split);}else{const group=document.createElement("div");group.className="seats";row.forEach(s=>group.append(makeSeat(s)));line.append(group);}host.append(line);});}
-function renderStats(){const count=seats.filter(s=>s.registrationIds.length).length;$("totalCount").textContent=seats.length;$("assignedCount").textContent=count;$("freeCount").textContent=seats.length-count;}
+
+const $ = id => document.getElementById(id);
+const supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const rowDefs = [
+  {row:1,left:21,right:0},{row:2,left:21,right:0},{row:3,left:21,right:0},
+  {row:4,left:21,right:0},{row:5,left:21,right:0},{row:6,left:21,right:0},
+  {row:7,left:15,right:9},{row:8,left:14,right:9},{row:9,left:13,right:10},
+  {row:10,left:11,right:10},{row:11,left:9,right:11},{row:12,left:7,right:11}
+];
+const seats = [];
+let sequence = 1;
+rowDefs.forEach(def => {
+  for(let i=0;i<def.left;i++) seats.push({id:sequence++,row:def.row,side:def.right?"izquierdo":"único",registrationIds:[]});
+  for(let i=0;i<def.right;i++) seats.push({id:sequence++,row:def.row,side:"derecho",registrationIds:[]});
+});
+let activities=[], people=[], selectedId=null, editMode=false, direction="left", activeActivityId=null;
+const directionKey = "espacioAcredita.auditorio.directions";
+const escapeHtml = value => String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const personById = id => people.find(person=>person.id===id);
+const seatForPerson = id => seats.find(seat=>seat.registrationIds.includes(id));
+const hasConflict = seat => seat.registrationIds.length>1;
+const setStatus = (message,bad=false) => { $("activityStatus").textContent=message; $("activityStatus").style.color=bad?"#a33333":""; };
+function readDirections(){try{return JSON.parse(localStorage.getItem(directionKey)||"{}");}catch{return {};}}
+function saveDirection(){const all=readDirections();all[activeActivityId]=direction;localStorage.setItem(directionKey,JSON.stringify(all));}
+function setDirectionForActivity(id){direction=readDirections()[id]==="right"?"right":"left";renumberSeats();updateNumberingUI();}
+function renumberSeats(){
+  let next=1;
+  rowDefs.forEach(def=>{
+    const rowSeats=seats.filter(seat=>seat.row===def.row);
+    (direction==="left"?rowSeats:[...rowSeats].reverse()).forEach(seat=>seat.id=next++);
+  });
+}
+function updateNumberingUI(){
+  const left=direction==="left";
+  $("numberingBtn").textContent=left?"Numeración: izquierda → derecha":"Numeración: derecha → izquierda";
+  $("numberingHelp").textContent=left
+    ?"La numeración se asigna fila por fila, desde la izquierda hacia la derecha, mirando desde el público al escenario. En las filas 7 a 12, el conteo continúa a través de ambos bloques y el pasillo central."
+    :"La numeración se asigna fila por fila, desde la derecha hacia la izquierda, mirando desde el público al escenario. En las filas 7 a 12, el conteo continúa a través de ambos bloques y el pasillo central.";
+}
+function updateModeUI(){
+  $("modeBtn").textContent=editMode?"Salir del modo edición":"Activar modo edición";
+  $("modeBtn").className=editMode?"":"primary";
+  $("selectionStatus").textContent=editMode
+    ?"Modo edición activo: seleccione una persona y luego un asiento para asignarla. Los cambios se guardan en Supabase."
+    :"Modo consulta: pase el cursor sobre un asiento para ver quién está asignado. Los clics no modifican las asignaciones.";
+}
+function showSeatInfo(seat){
+  const assigned=seat.registrationIds.map(personById).filter(Boolean);
+  let detail=`Asiento ${seat.id} · Fila ${seat.row}`;
+  if(!assigned.length) detail+=" · Disponible";
+  else if(assigned.length===1) detail+=` · ${assigned[0].name} · ${assigned[0].org||"Sin organización"}`;
+  else detail+=` · ⚠ CONFLICTO: ${assigned.map(person=>person.name+" ("+(person.org||"Sin organización")+")").join(" / ")}`;
+  $("seatInfo").textContent=detail;
+}
+function renderPeople(){
+  const query=$("search").value.trim().toLocaleLowerCase("es");
+  const list=people.filter(person=>(person.name+" "+person.org).toLocaleLowerCase("es").includes(query));
+  const conflicted=new Set(seats.filter(hasConflict).flatMap(seat=>seat.registrationIds));
+  $("listCount").textContent=`${people.length} inscritos · ${people.filter(person=>seatForPerson(person.id)).length} con asiento`;
+  $("peopleList").innerHTML=list.length?list.map(person=>{
+    const seat=seatForPerson(person.id), bad=conflicted.has(person.id);
+    const tag=bad?'<span class="seat-tag" style="color:#a84e00">⚠ Conflicto</span>':seat?`<span class="seat-tag">Fila ${seat.row} · As. ${seat.id}</span>`:"";
+    return `<div class="person ${selectedId===person.id?"active":""} ${seat?"assigned":""} ${bad?"conflict":""}" data-person="${escapeHtml(person.id)}">${tag}<div class="name">${escapeHtml(person.name)}</div><div class="org">${escapeHtml(person.org||"Sin organización")}</div></div>`;
+  }).join(""):'<div class="empty">No hay coincidencias.</div>';
+  document.querySelectorAll("[data-person]").forEach(element=>element.addEventListener("click",()=>{
+    selectedId=element.dataset.person;renderAll();
+  }));
+  $("unassignBtn").disabled=!selectedId||!seatForPerson(selectedId);
+}
+function makeSeat(seat){
+  const button=document.createElement("button");
+  button.type="button";button.className="seat";
+  const assigned=seat.registrationIds.map(personById).filter(Boolean);
+  button.innerHTML=hasConflict(seat)?`<span class="conflict-mark">⚠</span>${seat.id}`:String(seat.id);
+  if(assigned.length)button.classList.add(hasConflict(seat)?"conflict":"assigned");
+  if(selectedId&&seat.registrationIds.includes(selectedId))button.classList.add("selected");
+  button.title=`Asiento ${seat.id} · Fila ${seat.row}${assigned.length?": "+assigned.map(person=>person.name).join(" / "):" · Disponible"}`;
+  button.addEventListener("mouseenter",()=>showSeatInfo(seat));
+  button.addEventListener("focus",()=>showSeatInfo(seat));
+  button.addEventListener("click",async()=>{
+    if(!editMode){showSeatInfo(seat);return;}
+    if(!selectedId){alert("Primero seleccione una persona en la lista.");return;}
+    if(seat.registrationIds.includes(selectedId))return;
+    if(seat.registrationIds.length&&!confirm(`El asiento ${seat.id} ya está ocupado. ¿Desea agregar también a la persona seleccionada y registrar el conflicto?`))return;
+    const previous=seatForPerson(selectedId);
+    if(previous)previous.registrationIds=previous.registrationIds.filter(id=>id!==selectedId);
+    seat.registrationIds.push(selectedId);
+    const ok=await saveSeat(seat);
+    if(!ok)await loadActivity(activeActivityId);else renderAll();
+  });
+  return button;
+}
+function renderMap(){
+  const host=$("seatMap");host.innerHTML="";
+  rowDefs.forEach(def=>{
+    const rowSeats=seats.filter(seat=>seat.row===def.row);
+    const line=document.createElement("div");line.className="rowline";
+    const label=document.createElement("div");label.className="rowlabel";label.textContent=`FILA ${def.row}`;line.append(label);
+    if(def.right){
+      const left=document.createElement("div");left.className="side";
+      rowSeats.filter(seat=>seat.side==="izquierdo").forEach(seat=>left.append(makeSeat(seat)));
+      const aisle=document.createElement("div");aisle.className="aisle";aisle.textContent="PASILLO";
+      const right=document.createElement("div");right.className="side";
+      rowSeats.filter(seat=>seat.side==="derecho").forEach(seat=>right.append(makeSeat(seat)));
+      const split=document.createElement("div");split.className="split";split.append(left,aisle,right);line.append(split);
+    }else{
+      const group=document.createElement("div");group.className="seats";
+      rowSeats.forEach(seat=>group.append(makeSeat(seat)));line.append(group);
+    }
+    host.append(line);
+  });
+}
+function renderStats(){
+  const assigned=seats.filter(seat=>seat.registrationIds.length).length;
+  $("totalCount").textContent=seats.length;$("assignedCount").textContent=assigned;$("freeCount").textContent=seats.length-assigned;
+  $("assignedCount").title=`${seats.filter(hasConflict).length} asiento(s) con conflicto`;
+}
 function renderAll(){renderPeople();renderMap();renderStats();}
-async function saveSeat(s){const ids=s.registrationIds;const updates=ids.map(id=>{const p=personById(id);return supabase.from("registrations").update({seat_row:String(s.row),seat_number:String(s.id)}).eq("id",id).eq("activity_id",activeActivityId);});const results=await Promise.all(updates);const err=results.find(x=>x.error)?.error;if(err){alert("No se pudo guardar la asignación: "+err.message);await loadActivity(activeActivityId);}}
-async function loadActivity(id){activeActivityId=id;selectedId=null;seats.forEach(s=>s.registrationIds=[]);$("activityStatus").textContent="Cargando inscritos…";if(!id){people=[];renderAll();return;}const [r]=await Promise.all([supabase.from("registrations").select("id,activity_id,seat_row,seat_number,status,attendees(full_name,organization)").eq("activity_id",id).neq("status","cancelled").order("created_at",{ascending:true})]);if(r.error){$("activityStatus").textContent="Error al cargar: "+r.error.message;people=[];renderAll();return;}people=(r.data||[]).map(x=>({id:x.id,name:x.attendees?.full_name||"Sin nombre",org:x.attendees?.organization||"",seat_row:x.seat_row,seat_number:x.seat_number}));renumber();for(const p of people){const seat=seats.find(s=>String(s.id)===String(p.seat_number)&&String(s.row)===String(p.seat_row));if(seat)seat.registrationIds.push(p.id);}const invalid=people.filter(p=>p.seat_number&&!seatForPerson(p.id)).length;$("activityStatus").textContent=people.length+" inscritos · "+invalid+" asignaciones previas fuera del plano";renderAll();}
-async function loadSession(){if(!supabase){$("activityStatus").textContent="Falta configuración de Supabase.";return;}const {data:{session},error}=await supabase.auth.getSession();if(error||!session){$("activityStatus").textContent="Inicie sesión primero en Espacio Acredita.";$("peopleList").innerHTML='<div class="empty">No hay sesión activa. Vuelva a acreditación e inicie sesión.</div>';return;}const a=await supabase.from("activities").select("id,name,event_date,status").order("event_date",{ascending:false});if(a.error){$("activityStatus").textContent="No se pudieron cargar actividades: "+a.error.message;return;}activities=a.data||[];$("activitySelect").innerHTML='<option value="">Seleccione una actividad…</option>'+activities.map(x=>'<option value="'+x.id+'">'+esc(x.name)+" · "+(x.status==="open"?"Abierta":"Cerrada")+"</option>").join("");const wanted=new URLSearchParams(location.search).get("activity");if(wanted&&activities.some(x=>x.id===wanted))$("activitySelect").value=wanted;else if(activities.length)$("activitySelect").value=activities[0].id;await loadActivity($("activitySelect").value);}
-$("activitySelect").addEventListener("change",()=>loadActivity($("activitySelect").value));$("search").addEventListener("input",renderPeople);$("refreshBtn").addEventListener("click",()=>loadActivity(activeActivityId));$("modeBtn").addEventListener("click",()=>{editMode=!editMode;updateMode();});$("numberingBtn").addEventListener("click",()=>{if(people.some(p=>p.seat_number)&&!confirm("Cambiar sentido modifica los números de asiento de las sillas. ¿Continuar?"))return;direction=direction==="left"?"right":"left";renumber();people.forEach(p=>{const old=seatForPerson(p.id);if(old){p.seat_number=String(old.id);}});const aid=activeActivityId;seats.forEach(s=>s.registrationIds=[]);people.forEach(p=>{const seat=seats.find(s=>s.row===Number(p.seat_row)&&s.id===Number(p.seat_number));if(seat)seat.registrationIds.push(p.id);});updateNumbering();renderAll();});function updateNumbering(){$("numberingBtn").textContent=direction==="left"?"Numeración: izquierda → derecha":"Numeración: derecha → izquierda";$("numberingHelp").textContent=direction==="left"?"Conteo desde izquierda hacia derecha.":"Conteo desde derecha hacia izquierda.";}
-$("unassignBtn").addEventListener("click",async()=>{if(!selectedId)return;const p=personById(selectedId);const {error}=await supabase.from("registrations").update({seat_row:null,seat_number:null}).eq("id",selectedId).eq("activity_id",activeActivityId);if(error){alert(error.message);return;}const seat=seatForPerson(selectedId);if(seat)seat.registrationIds=seat.registrationIds.filter(id=>id!==selectedId);p.seat_number=null;p.seat_row=null;renderAll();});$("backBtn").addEventListener("click",()=>location.href="./index.html");$("logoutBtn").addEventListener("click",async()=>{await supabase.auth.signOut();location.href="./index.html";});
-seats.forEach(s=>s.registrationIds=[]);updateMode();updateNumbering();loadSession();
+function findSeat(row,number){return seats.find(seat=>String(seat.row)===String(row)&&String(seat.id)===String(number));}
+async function saveSeat(seat){
+  const updates=seat.registrationIds.map(id=>supabase.from("registrations")
+    .update({seat_row:String(seat.row),seat_number:String(seat.id)})
+    .eq("id",id).eq("activity_id",activeActivityId));
+  const results=await Promise.all(updates);
+  const failed=results.find(result=>result.error);
+  if(failed){alert("No se pudo guardar la asignación en Supabase: "+failed.error.message);return false;}
+  seat.registrationIds.forEach(id=>{const person=personById(id);if(person){person.seat_row=String(seat.row);person.seat_number=String(seat.id);}});
+  return true;
+}
+async function loadActivity(activityId){
+  activeActivityId=activityId||null;selectedId=null;
+  seats.forEach(seat=>seat.registrationIds=[]);people=[];
+  if(!activeActivityId){setStatus("Seleccione una actividad para cargar sus inscritos.");renderAll();return;}
+  setDirectionForActivity(activeActivityId);
+  setStatus("Cargando inscritos desde Supabase…");
+  const {data,error}=await supabase.from("registrations")
+    .select("id,activity_id,seat_row,seat_number,status,attendees(full_name,organization)")
+    .eq("activity_id",activeActivityId).neq("status","cancelled")
+    .order("created_at",{ascending:true});
+  if(error){setStatus("No se pudieron cargar los inscritos: "+error.message,true);renderAll();return;}
+  people=(data||[]).map(row=>({
+    id:row.id,name:row.attendees?.full_name||"Sin nombre",
+    org:row.attendees?.organization||"",seat_row:row.seat_row,seat_number:row.seat_number
+  }));
+  let invalid=0;
+  for(const person of people){
+    if(person.seat_number==null||person.seat_number==="")continue;
+    const seat=findSeat(person.seat_row,person.seat_number);
+    if(seat)seat.registrationIds.push(person.id);else invalid++;
+  }
+  const assigned=people.filter(person=>seatForPerson(person.id)).length;
+  setStatus(`${people.length} inscritos · ${assigned} con asiento · ${invalid} asignación(es) previas fuera del plano`);
+  renderAll();
+}
+async function loadSession(){
+  if(!supabase){setStatus("No se pudo inicializar Supabase.",true);return;}
+  const {data,error}=await supabase.auth.getSession();
+  if(error||!data.session){
+    setStatus("No hay una sesión activa. Vuelva a Espacio Acredita e inicie sesión.",true);
+    $("peopleList").innerHTML='<div class="empty">Inicie sesión primero en Espacio Acredita.</div>';
+    return;
+  }
+  $("userLabel").textContent=data.session.user.email||"Sesión autenticada";
+  const {data:rows,error:activitiesError}=await supabase.from("activities")
+    .select("id,name,event_date,status").order("event_date",{ascending:false});
+  if(activitiesError){setStatus("No se pudieron cargar las actividades: "+activitiesError.message,true);return;}
+  activities=rows||[];
+  $("activitySelect").innerHTML='<option value="">Seleccione una actividad…</option>'+activities.map(activity=>
+    `<option value="${escapeHtml(activity.id)}">${escapeHtml(activity.name)} · ${activity.status==="open"?"Abierta":"Cerrada"}</option>`).join("");
+  const requested=new URLSearchParams(location.search).get("activity");
+  const initial=activities.some(activity=>activity.id===requested)?requested:(activities[0]?.id||"");
+  $("activitySelect").value=initial;
+  await loadActivity(initial);
+}
+async function unassignSelected(){
+  if(!selectedId||!activeActivityId)return;
+  const {error}=await supabase.from("registrations").update({seat_row:null,seat_number:null})
+    .eq("id",selectedId).eq("activity_id",activeActivityId);
+  if(error){alert("No se pudo quitar el asiento: "+error.message);return;}
+  const seat=seatForPerson(selectedId);if(seat)seat.registrationIds=seat.registrationIds.filter(id=>id!==selectedId);
+  const person=personById(selectedId);if(person){person.seat_row=null;person.seat_number=null;}
+  renderAll();
+}
+async function clearActivityAssignments(){
+  if(!activeActivityId)return;
+  const assigned=people.filter(person=>person.seat_number!=null&&person.seat_number!=="").length;
+  if(!assigned){alert("Esta actividad no tiene asientos asignados.");return;}
+  if(!confirm(`¿Liberar los asientos de ${assigned} inscripción(es) de esta actividad? Los participantes se conservarán.`))return;
+  const {error}=await supabase.from("registrations").update({seat_row:null,seat_number:null})
+    .eq("activity_id",activeActivityId).neq("status","cancelled");
+  if(error){alert("No se pudieron liberar los asientos: "+error.message);return;}
+  await loadActivity(activeActivityId);
+}
+function csvText(){
+  const rows=[["Nombre","Organización","Número de asiento","Número de fila","Conflicto"]];
+  people.forEach(person=>{
+    const seat=seatForPerson(person.id);
+    rows.push([person.name,person.org,seat?seat.id:"",seat?seat.row:"",seat&&hasConflict(seat)?"SI":"NO"]);
+  });
+  return "\uFEFF"+rows.map(row=>row.map(value=>{
+    const text=String(value??"");return /[",;\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;
+  }).join(";")).join("\r\n");
+}
+function downloadCsv(isBackup=false){
+  if(!people.length){alert("No hay inscritos en esta actividad para exportar.");return;}
+  const blob=new Blob([csvText()],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  const activity=(activities.find(item=>item.id===activeActivityId)?.name||"actividad").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-");
+  const suffix=new Date().toISOString().slice(0,10);
+  a.href=url;a.download=(isBackup?"respaldo-":"asignacion-")+activity+"-"+suffix+".csv";
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function changeNumbering(){
+  if(!activeActivityId)return;
+  const anyAssigned=people.some(person=>person.seat_number!=null&&person.seat_number!=="");
+  if(anyAssigned){
+    alert("Para evitar cambiar el asiento físico de personas ya ubicadas, elija el sentido de numeración antes de realizar asignaciones. Para cambiarlo ahora, primero libere todos los asientos de esta actividad.");
+    return;
+  }
+  direction=direction==="left"?"right":"left";
+  renumberSeats();saveDirection();updateNumberingUI();renderAll();
+}
+$("activitySelect").addEventListener("change",()=>loadActivity($("activitySelect").value));
+$("search").addEventListener("input",renderPeople);
+$("refreshBtn").addEventListener("click",()=>loadActivity(activeActivityId));
+$("modeBtn").addEventListener("click",()=>{editMode=!editMode;updateModeUI();});
+$("numberingBtn").addEventListener("click",changeNumbering);
+$("unassignBtn").addEventListener("click",unassignSelected);
+$("clearBtn").addEventListener("click",clearActivityAssignments);
+$("exportBtn").addEventListener("click",()=>downloadCsv(false));
+$("backupBtn").addEventListener("click",()=>downloadCsv(true));
+$("backBtn").addEventListener("click",()=>location.href="./index.html");
+$("logoutBtn").addEventListener("click",async()=>{await supabase?.auth.signOut();location.href="./index.html";});
+updateModeUI();updateNumberingUI();loadSession();
