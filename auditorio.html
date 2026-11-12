@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestor de Asientos | Espacio Acredita</title>
+<link rel="stylesheet" href="./auditorio.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<header class="topbar">
+  <div><strong>ESPACIO ACREDITA · AUDITORIO</strong><small>Asignación de asientos por actividad</small></div>
+  <div class="header-actions"><button id="backBtn" class="secondary">← Volver a acreditación</button><button id="logoutBtn" class="secondary">Cerrar sesión</button></div>
+</header>
+<div class="layout">
+<aside class="sidebar">
+  <h2>Participantes</h2>
+  <label class="field-label" for="activitySelect">Actividad</label>
+  <select id="activitySelect"><option value="">Cargando actividades…</option></select>
+  <p class="sub" id="activityStatus">Seleccione una actividad para cargar sus inscritos.</p>
+  <input class="search" id="search" placeholder="Buscar nombre u organización…">
+  <div class="counts" id="counts">0 participantes</div>
+  <div class="person-list" id="peopleList"><div class="empty">Cargando…</div></div>
+  <div class="person-actions">
+    <button id="unassignBtn" disabled>Quitar asiento</button>
+    <button id="refreshBtn">Actualizar lista</button>
+  </div>
+  <p class="notice" id="notice" role="status">Seleccione una persona y luego haga clic en un asiento para asignarlo.</p>
+</aside>
+<main class="workspace">
+  <div class="toolbar">
+    <div><h1>Plano del auditorio</h1><p class="sub">Vista desde el público mirando al escenario.</p></div>
+    <div class="stats"><span><b id="totalCount">255</b> asientos</span><span><b id="assignedCount">0</b> asignados</span><span><b id="freeCount">255</b> libres</span></div>
+  </div>
+  <div class="toolbar controls">
+    <div class="legend"><span><i class="dot"></i>Disponible</span><span><i class="dot assigned"></i>Asignado</span><span><i class="dot selected"></i>Seleccionado</span><span><i class="dot conflict"></i>Conflicto</span></div>
+    <div class="control-actions">
+      <button id="modeBtn" class="primary">Activar modo edición</button>
+      <button id="numberingBtn">Numeración: izquierda → derecha</button>
+    </div>
+  </div>
+  <section class="auditorium"><div class="stage">ESCENARIO</div><div id="seatMap"></div></section>
+  <div class="status-panel" id="seatInfo">Modo consulta: pase el cursor sobre un asiento para ver su información.</div>
+  <p class="footnote" id="numberingHelp">La numeración se cuenta desde la izquierda hacia la derecha. En las filas con pasillo, el conteo continúa entre ambos bloques.</p>
+</main>
+</div>
+<script type="module" src="./src/auditorio.js"></script>
+</body></html>
