@@ -82,7 +82,13 @@
       <div class="form-grid"><label class="span-2">Actividad *<select id="csvActivity"></select></label><label class="span-2">Archivo CSV<input id="csvFile" type="file" accept=".csv,text/csv"></label></div>
       <div id="csvPreview" class="table-wrap"></div><div class="form-actions"><button id="downloadCsvTemplateBtn" class="secondary" type="button">Descargar formato CSV</button><button id="importCsvBtn" class="primary" disabled>Importar filas válidas</button></div><p id="csvMessage" class="message" role="status"></p>
     </div>
-    <div class="panel"><h2>Personas inscritas</h2><div class="form-grid"><label class="span-2">Filtrar por actividad<select id="registrationFilter"></select></label></div><div id="registrationsTable" class="table-wrap"></div></div>
+    <div class="panel"><h2>Personas inscritas</h2>
+<div class="form-grid"><label class="span-2">Filtrar por actividad<select id="registrationFilter"></select></label></div>
+<div class="bulk-toolbar"><label class="select-all-label"><input id="selectAllRegistrations" type="checkbox"> Seleccionar todos los inscritos visibles</label><span id="selectionSummary" class="muted">0 seleccionados</span></div>
+<div id="registrationsTable" class="table-wrap"></div>
+<div class="bulk-actions"><div><strong>Acciones masivas</strong><p id="bulkDeleteMessage" class="message" role="status">Seleccione uno o más inscritos para eliminarlos conjuntamente.</p></div>
+<div class="bulk-buttons"><button id="deleteSelectedBtn" class="secondary danger-btn" type="button" disabled>Eliminar seleccionados</button><button id="deleteAllVisibleBtn" class="danger-solid" type="button" disabled>Eliminar todos los inscritos</button></div></div>
+</div>
   </section>
   <section id="tab-tickets" class="tab-panel hidden">
     <div class="page-head"><div><h1>Entradas PDF/ZIP</h1><p class="muted">El diseño de la entrada se basa en la plantilla proporcionada.</p></div></div>
