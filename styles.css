@@ -9,3 +9,12 @@
 .bulk-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid #eee8f1}
 .bulk-actions strong{font-size:13px}.bulk-actions .message{margin:4px 0 0;max-width:620px}.bulk-buttons{display:flex;gap:8px;flex-wrap:wrap}
 .danger-solid{background:#9b2828;color:#fff;border:1px solid #9b2828}.danger-solid:hover{background:#7f2020}
+
+/* Advertencias de duplicados de correo durante la importación CSV */
+.badge.warning{background:#fff0dc;color:#91540e;border:1px solid #f1d2a8;white-space:normal;line-height:1.5}
+.csv-include{display:inline-flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.csv-include input{width:15px;min-width:15px;height:15px;accent-color:#35105c;cursor:pointer}
+.csv-exclude{font-size:11px;padding:5px 7px;margin-left:5px}
+.csv-excluded{opacity:.55;background:#f5f3f5}
+.csv-row-error{font-size:11px;color:#9b2828;margin-top:4px;max-width:240px}
+#csvPreview table{min-width:850px}
