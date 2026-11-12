@@ -176,8 +176,8 @@ async function importCsv(){
   if(error){row.importError=error.message;failed.push('Fila '+row.line+': '+error.message);}
   else{row.imported=true;row.importError="";ok++;}
  }
- await loadAll();refreshCsvDuplicateWarnings();
  const duplicateImported=selected.filter(row=>row.imported&&row.warnings.length).length;
+ await loadAll();refreshCsvDuplicateWarnings();
  say("csvMessage",'Importadas '+ok+' filas'+(duplicateImported?' (incluidas '+duplicateImported+' con correo repetido)':'')+'.'+(failed.length?' Errores: '+failed.slice(0,5).join(" | "):''),failed.length>0);
 }
 function ticketDocument(reg){
