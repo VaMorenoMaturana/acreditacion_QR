@@ -161,6 +161,12 @@ async function loadSession(){
     $("peopleList").innerHTML='<div class="empty">Inicie sesión primero en Espacio Acredita.</div>';
     return;
   }
+  const {data:profile,error:profileError}=await supabase.from("profiles").select("id,role").eq("id",data.session.user.id).maybeSingle();
+  if(profileError||!profile||!["staff","admin"].includes(profile.role)){
+    setStatus("La cuenta no tiene permisos de personal para gestionar el auditorio.",true);
+    $("peopleList").innerHTML='<div class="empty">Acceso no autorizado. Vuelva a Espacio Acredita.</div>';
+    return;
+  }
   $("userLabel").textContent=data.session.user.email||"Sesión autenticada";
   const {data:rows,error:activitiesError}=await supabase.from("activities")
     .select("id,name,event_date,status").order("event_date",{ascending:false});
@@ -196,7 +202,7 @@ function csvText(){
   const rows=[["Nombre","Organización","Número de asiento","Número de fila","Conflicto"]];
   people.forEach(person=>{
     const seat=seatForPerson(person.id);
-    rows.push([person.name,person.org,seat?seat.id:"",seat?seat.row:"",seat&&hasConflict(seat)?"SI":"NO"]);
+    rows.push([person.name,person.org,seat?seat.id:(person.seat_number||""),seat?seat.row:(person.seat_row||""),seat&&hasConflict(seat)?"SI":"NO"]);
   });
   return "\uFEFF"+rows.map(row=>row.map(value=>{
     const text=String(value??"");return /[",;\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;
@@ -213,7 +219,7 @@ function downloadCsv(isBackup=false){
 }
 async function changeNumbering(){
   if(!activeActivityId)return;
-  const anyAssigned=people.some(person=>person.seat_number!=null&&person.seat_number!=="");
+  const anyAssigned=seats.some(seat=>seat.registrationIds.length>0);
   if(anyAssigned){
     alert("Para evitar cambiar el asiento físico de personas ya ubicadas, elija el sentido de numeración antes de realizar asignaciones. Para cambiarlo ahora, primero libere todos los asientos de esta actividad.");
     return;
