@@ -34,7 +34,7 @@ async function loadAll(){
     supabase.from("profiles").select("*").order("created_at",{ascending:true})
   ]);
   for(const [name,res] of [["actividades",a],["inscripciones",r],["acreditaciones",c],["perfiles",p]]) if(res.error) console.warn(`Carga de ${name}:`,res.error.message);
-  activities=a.data||[];registrations=(r.data||[]).map(x=>({...x,attendee:x.attendees||{}}));checkins=c.data||[];
+  activities=a.data||[];registrations=(r.data||[]).map(x=>({...x,attendee:x.attendees||{}}));const validRegistrationIds=new Set(registrations.map(x=>x.id));for(const id of selectedRegistrationIds)if(!validRegistrationIds.has(id))selectedRegistrationIds.delete(id);checkins=c.data||[];
   activityOptions("registrationActivity");activityOptions("csvActivity");activityOptions("registrationFilter",true);activityOptions("ticketActivity");activityOptions("checkinActivity");
   renderAll();renderUsers(p.data||[]);
 }
@@ -209,7 +209,7 @@ async function startScanner(){
 async function stopScanner(){if(scanner){try{await scanner.stop();await scanner.clear();}catch{}scanner=null;}$("startScannerBtn").disabled=false;$("stopScannerBtn").disabled=true;}
 async function editActivity(id){const a=selectedActivity(id);if(!a)return;$("activityId").value=a.id;$("activityName").value=a.name;$("activityDescription").value=a.description||"";$("activityTagline").value=a.tagline||"";$("activityPlace").value=a.place;$("activityDate").value=a.event_date;$("activityStart").value=a.start_time;$("activityEnd").value=a.end_time||"";$("activityStatus").value=a.status;logoData={institution:a.institution_logo||"",project:a.project_logo||"",partner:a.partner_logo||""};switchTab("activities");}
 async function toggleActivity(id){const a=selectedActivity(id);if(!a)return;const {error}=await supabase.from("activities").update({status:a.status==="open"?"closed":"open"}).eq("id",id);if(error)alert(error.message);else await loadAll();}
-async function deleteRegistration(id){const r=selectedRegistration(id);if(!confirm(`¿Eliminar definitivamente a ${r?.attendee.full_name||"este inscrito"}? Se borrarán su inscripción y su QR; no se puede deshacer.`))return;const {error}=await supabase.rpc("delete_registration",{p_registration_id:id});if(error)alert(error.message);else await loadAll();}
+async function deleteRegistration(id){const r=selectedRegistration(id);if(!confirm(`¿Eliminar definitivamente a ${r?.attendee.full_name||"este inscrito"}? Se borrarán su inscripción y su QR; no se puede deshacer.`))return;const {error}=await supabase.rpc("delete_registration",{p_registration_id:id});if(error)alert(error.message);else{selectedRegistrationIds.delete(id);await loadAll();}}
 async function deleteRegistrationBatch(ids,operationLabel){
   const uniqueIds=[...new Set(ids)];if(!uniqueIds.length)return;
   $("deleteSelectedBtn").disabled=true;$("deleteAllVisibleBtn").disabled=true;
