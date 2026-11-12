@@ -69,3 +69,10 @@ El importador valida campos y duplicados dentro del archivo; la base de datos ev
 - Build command: dejar vacío.
 - Publish directory: `.`
 - Usar HTTPS para habilitar la cámara del dispositivo.
+
+
+## Módulo de auditorios
+- El botón **Asignación de asientos** abre `auditorio.html`, una página independiente que conserva el diseño del Gestor de Asientos.
+- El módulo utiliza la sesión de Supabase Auth existente y carga participantes de la actividad seleccionada desde `registrations` + `attendees`. Mantiene la interfaz aprobada del Gestor, con listado a la izquierda, plano de 255 asientos, modo consulta/edición, conflictos, cambio de numeración (configurable antes de asignar), CSV de exportación y respaldo.
+- La asignación actualiza únicamente `registrations.seat_row` y `registrations.seat_number`. No cambia QR, estado de acreditación ni datos de asistentes.
+- No requiere migración de base de datos. Las pruebas deben realizarse primero en actividad de prueba.

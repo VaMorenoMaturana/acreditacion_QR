@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Asientos · Auditorio</title>
+<link rel="stylesheet" href="./auditorio.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<header>
+  <strong>GESTOR DE ASIENTOS · AUDITORIO</strong>
+  <div class="header-actions"><span id="userLabel">Espacio Acredita</span><button id="backBtn">← Volver a acreditación</button><button id="logoutBtn">Cerrar sesión</button></div>
+</header>
+<div class="app">
+<aside class="sidebar">
+  <h2>Participantes</h2>
+  <p class="sub">Inscritos en la actividad seleccionada, cargados directamente desde Espacio Acredita.</p>
+  <label class="field-label" for="activitySelect">Actividad</label>
+  <select id="activitySelect" class="activity-select"><option value="">Cargando actividades…</option></select>
+  <div class="sub" id="activityStatus" style="margin:8px 0">Conectando con Supabase…</div>
+  <input class="search" id="search" placeholder="Buscar por nombre u organización…">
+  <div class="sub" id="listCount">0 participantes</div>
+  <div class="person-list" id="peopleList"><div class="empty">Cargando participantes…</div></div>
+  <div class="status" id="selectionStatus">Seleccione un participante y luego un asiento para asignarlo en modo edición.</div>
+  <h3>Acciones</h3>
+  <div class="actions">
+    <button id="unassignBtn" disabled>Quitar asiento</button>
+    <button id="refreshBtn">Actualizar lista</button>
+    <button id="exportBtn">Exportar CSV</button>
+    <button id="backupBtn">Generar respaldo</button>
+    <button id="clearBtn" class="danger">Limpiar asignaciones de esta actividad</button>
+  </div>
+  <p class="sub">Los cambios se guardan inmediatamente en Supabase. Los datos personales y los códigos QR no se modifican.</p>
+</aside>
+<main class="main">
+  <div class="toolbar">
+    <div><h2 style="margin-bottom:3px">Plano del auditorio</h2><div class="sub">Vista desde el público; escenario al frente.</div></div>
+    <div class="stats">
+      <div class="stat"><b id="totalCount">255</b> asientos</div>
+      <div class="stat"><b id="assignedCount">0</b> asignados</div>
+      <div class="stat"><b id="freeCount">255</b> disponibles</div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="legend"><span><i class="dot"></i>Disponible</span><span><i class="dot a"></i>Asignado</span><span><i class="dot s"></i>Selección</span><span><i class="dot conflict-dot"></i>Conflicto</span></div>
+    <div class="actions" style="margin:0">
+      <button id="modeBtn" class="primary">Activar modo edición</button>
+      <button id="numberingBtn">Numeración: izquierda → derecha</button>
+    </div>
+  </div>
+  <section class="auditorium">
+    <div class="stage">ESCENARIO</div>
+    <div id="seatMap"></div>
+  </section>
+  <div class="status" id="seatInfo" style="margin-top:12px">Modo consulta: pase el cursor sobre un asiento para ver quién está asignado. Active el modo edición para realizar cambios.</div>
+  <p class="help" id="numberingHelp" style="margin-top:12px">La numeración se asigna fila por fila, desde la izquierda hacia la derecha, mirando desde el público al escenario. En las filas 7 a 12, el conteo continúa a través de ambos bloques y el pasillo central.</p>
+</main>
+</div>
+<script type="module" src="./src/auditorio.js"></script>
+</body></html>
