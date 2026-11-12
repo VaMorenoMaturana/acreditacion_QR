@@ -7,6 +7,7 @@ const validConfig = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.include
 if (!validConfig) $("setupNotice").classList.remove("hidden");
 const supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null, currentProfile = null, activities = [], registrations = [], checkins = [];
+const selectedRegistrationIds = new Set();
 let csvRows = [], scanner = null, logoData = {institution:"",project:"",partner:""};
 const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const say = (id, message, bad=false) => { const el=$(id); if(el){el.textContent=message;el.style.color=bad?"#9b2828":"";} };
@@ -45,10 +46,33 @@ function renderAll(){
   $("activitiesTable").innerHTML=table(["Actividad","Fecha","Lugar","Estado","Acciones"],activities.map(a=>`<tr><td>${escapeHtml(a.name)}</td><td>${dateLabel(a.event_date)}</td><td>${escapeHtml(a.place)}</td><td>${a.status==="open"?"Abierta":"Cerrada"}</td><td><button class="secondary" data-edit-activity="${a.id}">Editar</button><button class="secondary" data-toggle-activity="${a.id}">${a.status==="open"?"Cerrar":"Reabrir"}</button></td></tr>`));
   renderRegistrations();renderTicketRegistrationOptions();renderCheckins();
 }
-function renderRegistrations(){
+function visibleRegistrations(){
   const filter=$("registrationFilter").value;
-  const list=registrations.filter(r=>!filter||r.activity_id===filter);
-  $("registrationsTable").innerHTML=table(["Persona","Correo","Organización","Fila","Asiento","Actividad","Estado","Acciones"],list.map(r=>`<tr><td><span class="name-cell">${escapeHtml(r.attendee.full_name)}<button class="secondary danger-btn" data-delete="${r.id}" title="Eliminar inscrito" aria-label="Eliminar inscrito">🗑</button></span></td><td>${escapeHtml(r.attendee.email||"—")}</td><td>${escapeHtml(r.attendee.organization||"—")}</td><td>${escapeHtml(r.seat_row||"-")}</td><td>${escapeHtml(r.seat_number||"-")}</td><td>${escapeHtml(selectedActivity(r.activity_id)?.name||"—")}</td><td>${r.status==="checked_in"?"Acreditada":r.status==="cancelled"?"Cancelada":"Pendiente"}</td><td><button class="secondary" data-ticket="${r.id}">PDF</button><button class="secondary" data-cancel="${r.id}" ${r.status==="cancelled"?"disabled":""}>Cancelar</button></td></tr>`));
+  return registrations.filter(r=>!filter||r.activity_id===filter);
+}
+function updateBulkSelectionUI(list=visibleRegistrations()){
+  const ids=list.map(r=>r.id),selected=ids.filter(id=>selectedRegistrationIds.has(id)).length;
+  $("selectionSummary").textContent=`${selectedRegistrationIds.size} seleccionados · ${list.length} visibles`;
+  $("deleteSelectedBtn").disabled=selectedRegistrationIds.size===0;
+  $("deleteSelectedBtn").textContent=selectedRegistrationIds.size?`Eliminar seleccionados (${selectedRegistrationIds.size})`:"Eliminar seleccionados";
+  $("deleteAllVisibleBtn").disabled=list.length===0;
+  $("selectAllRegistrations").checked=ids.length>0&&selected===ids.length;
+  $("selectAllRegistrations").indeterminate=selected>0&&selected<ids.length;
+}
+function renderRegistrations(){
+  const list=visibleRegistrations();
+  if(!list.length){$("registrationsTable").innerHTML='<p class="muted">Sin inscripciones para mostrar.</p>';updateBulkSelectionUI(list);return;}
+  const rows=list.map(r=>`<tr class="${selectedRegistrationIds.has(r.id)?"row-selected":""}">
+    <td><input type="checkbox" class="registration-select" data-select-registration="${r.id}" aria-label="Seleccionar ${escapeHtml(r.attendee.full_name)}" ${selectedRegistrationIds.has(r.id)?"checked":""}></td>
+    <td><span class="name-cell">${escapeHtml(r.attendee.full_name)}<button class="secondary danger-btn" data-delete="${r.id}" title="Eliminar inscrito" aria-label="Eliminar inscrito">🗑</button></span></td>
+    <td>${escapeHtml(r.attendee.email||"—")}</td><td>${escapeHtml(r.attendee.organization||"—")}</td>
+    <td>${escapeHtml(r.seat_row||"-")}</td><td>${escapeHtml(r.seat_number||"-")}</td>
+    <td>${escapeHtml(selectedActivity(r.activity_id)?.name||"—")}</td>
+    <td>${r.status==="checked_in"?"Acreditada":r.status==="cancelled"?"Cancelada":"Pendiente"}</td>
+    <td><button class="secondary" data-ticket="${r.id}">PDF</button><button class="secondary" data-cancel="${r.id}" ${r.status==="cancelled"?"disabled":""}>Cancelar</button></td>
+  </tr>`).join("");
+  $("registrationsTable").innerHTML=`<table><thead><tr><th class="selection-column">Sel.</th><th>Persona</th><th>Correo</th><th>Organización</th><th>Fila</th><th>Asiento</th><th>Actividad</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table>`;
+  updateBulkSelectionUI(list);
 }
 function renderTicketRegistrationOptions(){
  const aid=$("ticketActivity").value;
@@ -186,6 +210,33 @@ async function stopScanner(){if(scanner){try{await scanner.stop();await scanner.
 async function editActivity(id){const a=selectedActivity(id);if(!a)return;$("activityId").value=a.id;$("activityName").value=a.name;$("activityDescription").value=a.description||"";$("activityTagline").value=a.tagline||"";$("activityPlace").value=a.place;$("activityDate").value=a.event_date;$("activityStart").value=a.start_time;$("activityEnd").value=a.end_time||"";$("activityStatus").value=a.status;logoData={institution:a.institution_logo||"",project:a.project_logo||"",partner:a.partner_logo||""};switchTab("activities");}
 async function toggleActivity(id){const a=selectedActivity(id);if(!a)return;const {error}=await supabase.from("activities").update({status:a.status==="open"?"closed":"open"}).eq("id",id);if(error)alert(error.message);else await loadAll();}
 async function deleteRegistration(id){const r=selectedRegistration(id);if(!confirm(`¿Eliminar definitivamente a ${r?.attendee.full_name||"este inscrito"}? Se borrarán su inscripción y su QR; no se puede deshacer.`))return;const {error}=await supabase.rpc("delete_registration",{p_registration_id:id});if(error)alert(error.message);else await loadAll();}
+async function deleteRegistrationBatch(ids,operationLabel){
+  const uniqueIds=[...new Set(ids)];if(!uniqueIds.length)return;
+  $("deleteSelectedBtn").disabled=true;$("deleteAllVisibleBtn").disabled=true;
+  let deleted=0,failures=[];
+  for(let i=0;i<uniqueIds.length;i++){
+    say("bulkDeleteMessage",`${operationLabel}: eliminando ${i+1} de ${uniqueIds.length}…`);
+    const {error}=await supabase.rpc("delete_registration",{p_registration_id:uniqueIds[i]});
+    if(error)failures.push(error.message);else{deleted++;selectedRegistrationIds.delete(uniqueIds[i]);}
+  }
+  await loadAll();
+  if(failures.length)say("bulkDeleteMessage",`Finalizado: ${deleted} eliminados; ${failures.length} con error. ${failures.slice(0,3).join(" | ")}`,true);
+  else say("bulkDeleteMessage",`Finalizado: ${deleted} inscripción(es) eliminada(s), incluidos sus QR y registros de acreditación asociados.`);
+}
+async function deleteSelectedRegistrations(){
+  const ids=[...selectedRegistrationIds];if(!ids.length)return;
+  if(!confirm(`Va a eliminar definitivamente ${ids.length} inscripción(es) seleccionada(s). Se borrarán sus QR y registros de acreditación asociados. Otras inscripciones de las mismas personas en actividades distintas se conservarán. ¿Desea continuar?`))return;
+  await deleteRegistrationBatch(ids,"Eliminación seleccionada");
+}
+async function deleteAllVisibleRegistrations(){
+  const list=visibleRegistrations();if(!list.length)return;
+  const filter=$("registrationFilter").value;
+  const scope=filter?`la actividad «${selectedActivity(filter)?.name||"seleccionada"}»`:"TODAS las actividades";
+  if(!confirm(`ATENCIÓN: se eliminarán TODOS los inscritos de ${scope}. Total: ${list.length} inscripción(es). También se eliminarán sus QR y registros de acreditación asociados. No se puede deshacer. Las inscripciones de esas personas en otras actividades se conservan. ¿Desea continuar?`))return;
+  const typed=prompt(`Para confirmar, escriba exactamente ELIMINAR (se eliminarán ${list.length} inscripciones de ${scope}):`);
+  if(typed!=="ELIMINAR"){say("bulkDeleteMessage","Eliminación cancelada: la confirmación no coincidió.");return;}
+  await deleteRegistrationBatch(list.map(r=>r.id),"Eliminación masiva");
+}
 function downloadCsvTemplate(){const csv="\uFEFFnombre,email,organizacion,fila,asiento\nMaría Pérez,maria@ejemplo.cl,Fundación Ejemplo,A,12\nJuan Soto,juan@ejemplo.cl,,,\n";const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="formato_inscripcion_masiva.csv";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 async function cancelRegistration(id){if(!confirm("¿Cancelar esta inscripción? El QR dejará de ser válido."))return;const {error}=await supabase.from("registrations").update({status:"cancelled"}).eq("id",id);if(error)alert(error.message);else await loadAll();}
 async function saveRole(id){const role=document.querySelector(`[data-role-user="${id}"]`).value;const {error}=await supabase.from("profiles").update({role}).eq("id",id);if(error)alert(error.message);else await loadAll();}
@@ -194,7 +245,19 @@ $("loginForm").addEventListener("submit",async ev=>{ev.preventDefault();say("log
 $("logoutBtn").addEventListener("click",async()=>{await stopScanner();await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);});
 async function afterLogin(){const {data,error}=await supabase.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();if(error||!data){say("loginMessage","La cuenta no tiene perfil autorizado. Solicita al administrador que la habilite.",true);await supabase.auth.signOut();return;}currentProfile=data;setSignedIn(true);await loadAll();switchTab("dashboard");}
 $("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
-$("registrationFilter").addEventListener("change",renderRegistrations);$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
+$("registrationFilter").addEventListener("change",()=>{selectedRegistrationIds.clear();renderRegistrations();say("bulkDeleteMessage","Selección reiniciada al cambiar el filtro.");});
+$("selectAllRegistrations").addEventListener("change",ev=>{
+  visibleRegistrations().forEach(reg=>ev.target.checked?selectedRegistrationIds.add(reg.id):selectedRegistrationIds.delete(reg.id));
+  renderRegistrations();
+});
+$("registrationsTable").addEventListener("change",ev=>{
+  const checkbox=ev.target.closest("[data-select-registration]");if(!checkbox)return;
+  if(checkbox.checked)selectedRegistrationIds.add(checkbox.dataset.selectRegistration);
+  else selectedRegistrationIds.delete(checkbox.dataset.selectRegistration);
+  renderRegistrations();
+});
+$("deleteSelectedBtn").addEventListener("click",deleteSelectedRegistrations);
+$("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
 $("manualCheckinForm").addEventListener("submit",ev=>{ev.preventDefault();checkin(val("manualToken"));});$("startScannerBtn").addEventListener("click",startScanner);$("stopScannerBtn").addEventListener("click",stopScanner);
 document.addEventListener("click",ev=>{const t=ev.target.closest("[data-tab],[data-goto],[data-edit-activity],[data-toggle-activity],[data-ticket],[data-cancel],[data-delete],[data-save-role]");if(!t)return;if(t.dataset.goto==="auditorio"){const aid=val("registrationFilter")||val("registrationActivity")||activities[0]?.id||"";location.href="./auditorio.html"+(aid?"?activity="+encodeURIComponent(aid):"");return;}if(t.dataset.tab)switchTab(t.dataset.tab);if(t.dataset.goto)switchTab(t.dataset.goto);if(t.dataset.editActivity)editActivity(t.dataset.editActivity);if(t.dataset.toggleActivity)toggleActivity(t.dataset.toggleActivity);if(t.dataset.ticket){const r=selectedRegistration(t.dataset.ticket);if(r){$("ticketActivity").value=r.activity_id;renderTicketRegistrationOptions();$("ticketRegistration").value=r.id;renderTicketPreview();switchTab("tickets");}}if(t.dataset.cancel)cancelRegistration(t.dataset.cancel);if(t.dataset.delete)deleteRegistration(t.dataset.delete);if(t.dataset.saveRole)saveRole(t.dataset.saveRole);});
 for(const [input,key] of [["activityLogo","institution"],["projectLogo","project"],["partnerLogo","partner"]])$(input).addEventListener("change",async ev=>{const f=ev.target.files?.[0];if(!f)return;if(!f.type.startsWith("image/")){say("activityMessage","Selecciona un archivo de imagen.",true);return;}if(f.size>1_500_000){say("activityMessage","El logotipo supera 1,5 MB. Reduce su tamaño antes de subirlo.",true);return;}logoData[key]=await fileAsDataUrl(f);});
