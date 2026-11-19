@@ -31,6 +31,36 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 6. Publica el contenido de esta carpeta como Static Site en Render. Build command vacío; Publish directory `.`.
 7. Accede con la cuenta creada. Crea una actividad de prueba y registra asistentes ficticios antes de usar datos reales.
 
+## Administración de usuarios
+
+La pestaña **Administración** permite invitar a nuevos usuarios sin crear contraseñas manualmente. El administrador indica el correo y el rol (`staff` o `admin`); Supabase envía una invitación para que la persona valide su correo y defina su propia contraseña.
+
+La creación se ejecuta mediante la función Edge `admin-invite-user`. Esta función valida el JWT del solicitante y comprueba en `public.profiles` que su rol sea `admin`. La clave `service_role` se utiliza exclusivamente dentro del entorno seguro de Supabase y nunca debe agregarse a `src/config.js`, al frontend ni a Render.
+
+### Despliegue de la función
+
+Después de actualizar el repositorio, despliegue una vez la función en el proyecto Supabase correspondiente:
+
+1. Instale Supabase CLI y autentíquese:
+   ```bash
+   supabase login
+   ```
+2. Vincule el repositorio al proyecto (reemplace el identificador por el Project Ref de Supabase):
+   ```bash
+   supabase link --project-ref <PROJECT_REF>
+   ```
+3. Despliegue la función:
+   ```bash
+   supabase functions deploy admin-invite-user
+   ```
+
+La función utiliza las variables de entorno administradas por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`). No copie la clave privilegiada a archivos del repositorio ni a variables públicas del sitio.
+
+### Configuración del correo
+
+En Supabase, configure **Authentication → URL Configuration** con la URL pública de Espacio Acredita como *Site URL* y agregue esa misma URL a las direcciones de redirección permitidas. Configure también un proveedor SMTP en **Authentication → SMTP Settings** para asegurar la entrega de invitaciones. Revise la plantilla de correo de invitación y haga primero una prueba con una cuenta controlada.
+
+No es necesario ejecutar una migración SQL adicional: el trigger `handle_new_user` existente crea el perfil y la función Edge asigna el rol solicitado. La invitación solo se envía a través de la pestaña de Administración y por un usuario autenticado con rol administrador.
 ## Plantilla del ticket
 - `ticket-template-original.html` es el archivo original adjunto, preservado sin modificaciones.
 - `src/ticket-template.js` conserva el markup del ticket y `src/ticket.css` define sus estilos compartidos para vista previa y exportación PDF.
