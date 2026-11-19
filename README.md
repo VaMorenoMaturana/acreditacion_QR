@@ -33,13 +33,13 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 
 ## Administración de usuarios
 
-La pestaña **Administración** permite invitar a nuevos usuarios sin crear contraseñas manualmente. El administrador indica el correo y el rol (`staff` o `admin`); Supabase envía una invitación para que la persona valide su correo y defina su propia contraseña.
+La pestaña **Administración** permite crear cuentas directamente. El administrador ingresa el correo (que funciona como nombre de usuario), define la contraseña y selecciona el rol (`staff` o `admin`). La cuenta queda habilitada para iniciar sesión inmediatamente; no se envía invitación ni correo de confirmación.
 
-La creación se ejecuta mediante la función Edge `admin-invite-user`. Esta función valida el JWT del solicitante y comprueba en `public.profiles` que su rol sea `admin`. La clave `service_role` se utiliza exclusivamente dentro del entorno seguro de Supabase y nunca debe agregarse a `src/config.js`, al frontend ni a Render.
+La creación se ejecuta mediante la función Edge `admin-invite-user` (nombre técnico conservado para mantener la ruta de función ya configurada). La función valida el JWT del solicitante y comprueba que tenga rol `admin` en `public.profiles`. La clave `service_role` se utiliza exclusivamente dentro del entorno seguro de Supabase y nunca debe agregarse a `src/config.js`, al frontend ni a Render.
 
 ### Despliegue de la función
 
-Después de actualizar el repositorio, despliegue una vez la función en el proyecto Supabase correspondiente:
+Después de actualizar el repositorio, despliegue la función en el proyecto Supabase correspondiente:
 
 1. Instale Supabase CLI y autentíquese:
    ```bash
@@ -56,11 +56,7 @@ Después de actualizar el repositorio, despliegue una vez la función en el proy
 
 La función utiliza las variables de entorno administradas por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`). No copie la clave privilegiada a archivos del repositorio ni a variables públicas del sitio.
 
-### Configuración del correo
-
-En Supabase, configure **Authentication → URL Configuration** con la URL pública de Espacio Acredita como *Site URL* y agregue esa misma URL a las direcciones de redirección permitidas. Configure también un proveedor SMTP en **Authentication → SMTP Settings** para asegurar la entrega de invitaciones. Revise la plantilla de correo de invitación y haga primero una prueba con una cuenta controlada.
-
-No es necesario ejecutar una migración SQL adicional: el trigger `handle_new_user` existente crea el perfil y la función Edge asigna el rol solicitado. La invitación solo se envía a través de la pestaña de Administración y por un usuario autenticado con rol administrador.
+No es necesario ejecutar una migración SQL adicional: el trigger `handle_new_user` existente crea el perfil y la función Edge asigna el rol solicitado. La contraseña solo se recibe durante la creación, no se escribe en los registros de auditoría ni se devuelve al frontend. El administrador debe entregarla al usuario por un canal seguro y verificar cuidadosamente el correo, ya que la cuenta se crea con ese correo confirmado para permitir acceso inmediato.
 ## Plantilla del ticket
 - `ticket-template-original.html` es el archivo original adjunto, preservado sin modificaciones.
 - `src/ticket-template.js` conserva el markup del ticket y `src/ticket.css` define sus estilos compartidos para vista previa y exportación PDF.
