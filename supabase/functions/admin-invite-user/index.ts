@@ -70,7 +70,7 @@ Deno.serve(async (req: Request) => {
     if (password.length < 8 || password.length > 128) {
       return jsonResponse(400, { error: "La contraseña debe tener entre 8 y 128 caracteres." });
     }
-    if (role !== "staff" && role !== "admin") {
+    if (role !== "staff" && role !== "admin" && role !== "volunteer") {
       return jsonResponse(400, { error: "El rol seleccionado no es válido." });
     }
 
