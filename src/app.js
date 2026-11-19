@@ -297,12 +297,38 @@ async function deleteAllVisibleRegistrations(){
 }
 function downloadCsvTemplate(){const csv="\uFEFFnombre,email,organizacion,fila,asiento\nMaría Pérez,maria@ejemplo.cl,Fundación Ejemplo,A,12\nJuan Soto,juan@ejemplo.cl,,,\n";const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="formato_inscripcion_masiva.csv";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 async function cancelRegistration(id){if(!confirm("¿Cancelar esta inscripción? El QR dejará de ser válido."))return;const {error}=await supabase.from("registrations").update({status:"cancelled"}).eq("id",id);if(error)alert(error.message);else await loadAll();}
+async function inviteUser(ev){
+ ev.preventDefault();
+ if(currentProfile?.role!=="admin"){say("inviteUserMessage","Solo un administrador puede invitar usuarios.",true);return;}
+ const email=val("inviteEmail").toLowerCase();
+ const role=val("inviteRole");
+ if(!email){say("inviteUserMessage","Ingrese un correo electrónico.",true);return;}
+ const button=$("inviteUserForm").querySelector('button[type="submit"]');
+ button.disabled=true;button.textContent="Enviando invitación…";
+ say("inviteUserMessage","Creando la invitación…");
+ try{
+  const {data,error}=await supabase.functions.invoke("admin-invite-user",{body:{email,role}});
+  if(error){
+   let message=error.message||"No fue posible enviar la invitación.";
+   try{const response=error.context;const body=response?.clone?await response.clone().json():null;if(body?.error)message=body.error;}catch{}
+   say("inviteUserMessage",message,true);return;
+  }
+  if(!data?.success){say("inviteUserMessage",data?.error||"No fue posible completar la invitación.",true);return;}
+  $("inviteUserForm").reset();
+  say("inviteUserMessage",data.message||"Invitación enviada correctamente.");
+  await loadAll();
+ }catch(error){
+  say("inviteUserMessage",error?.message||"No fue posible conectar con el servicio de invitaciones.",true);
+ }finally{
+  button.disabled=false;button.textContent="Enviar invitación";
+ }
+}
 async function saveRole(id){const role=document.querySelector(`[data-role-user="${id}"]`).value;const {error}=await supabase.from("profiles").update({role}).eq("id",id);if(error)alert(error.message);else await loadAll();}
 function switchTab(name){document.querySelectorAll(".tab-panel").forEach(x=>x.classList.add("hidden"));$("tab-"+name)?.classList.remove("hidden");document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));if(name==="tickets")resizeTicketPreview();}
 $("loginForm").addEventListener("submit",async ev=>{ev.preventDefault();say("loginMessage","Iniciando sesión…");if(!supabase){say("loginMessage","Configura Supabase en src/config.js.",true);return;}const {data,error}=await supabase.auth.signInWithPassword({email:val("loginEmail"),password:$("loginPassword").value});if(error){say("loginMessage",error.message,true);return;}currentUser=data.user;await afterLogin();});
 $("logoutBtn").addEventListener("click",async()=>{await stopScanner();await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);});
 async function afterLogin(){const {data,error}=await supabase.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();if(error||!data){say("loginMessage","La cuenta no tiene perfil autorizado. Solicita al administrador que la habilite.",true);await supabase.auth.signOut();return;}currentProfile=data;setSignedIn(true);await loadAll();switchTab("dashboard");}
-$("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
+$("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("inviteUserForm").addEventListener("submit",inviteUser);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
 $("registrationFilter").addEventListener("change",()=>{selectedRegistrationIds.clear();renderRegistrations();say("bulkDeleteMessage","Selección reiniciada al cambiar el filtro.");});
 $("csvActivity").addEventListener("change",refreshCsvDuplicateWarnings);
 $("selectAllRegistrations").addEventListener("change",ev=>{
