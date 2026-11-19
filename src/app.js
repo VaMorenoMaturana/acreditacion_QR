@@ -54,6 +54,9 @@ async function loadAll(){
   renderAll();renderUsers(p.data||[]);
 }
 function renderAll(){
+  if(currentProfile?.role==="volunteer"){
+    renderCheckins();renderManualCheckinList();return;
+  }
   const open=activities.filter(a=>a.status==="open").length, checked=registrations.filter(r=>r.status==="checked_in").length;
   $("statActivities").textContent=open;$("statRegistrations").textContent=registrations.length;$("statChecked").textContent=checked;$("statPending").textContent=registrations.filter(r=>r.status==="registered").length;
   const recent=activities.slice(0,6).map(a=>`<tr><td>${escapeHtml(a.name)}</td><td>${dateLabel(a.event_date)}</td><td><span class="badge ${a.status==="open"?"good":"bad"}">${a.status==="open"?"Abierta":"Cerrada"}</span></td><td>${registrations.filter(r=>r.activity_id===a.id).length}</td></tr>`);
@@ -90,6 +93,7 @@ function renderRegistrations(){
   updateBulkSelectionUI(list);
 }
 function renderTicketRegistrationOptions(){
+ if(currentProfile?.role==="volunteer"){$("ticketRegistration").innerHTML="";$("ticketPreview").innerHTML="";return;}
  const aid=$("ticketActivity").value;
  $("ticketRegistration").innerHTML=registrations.filter(r=>r.activity_id===aid&&r.status!=="cancelled").map(r=>`<option value="${r.id}">${escapeHtml(r.attendee.full_name)} · ${escapeHtml(r.attendee.email||"sin correo")}</option>`).join("");
  renderTicketPreview();
