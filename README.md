@@ -9,7 +9,7 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 - Importación CSV con vista previa, validación básica y reporte de filas inválidas.
 - Entradas PDF individuales y ZIP por actividad.
 - Acreditación por cámara (requiere HTTPS y permiso de cámara) o token manual.
-- Roles `staff` y `admin` en Supabase.
+- Roles `staff`, `admin` y `volunteer` en Supabase.
 - Registro de acreditaciones y operaciones básicas en `audit_logs`.
 
 ## Arquitectura
@@ -20,7 +20,7 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 
 ## Puesta en marcha
 1. Crea un proyecto Supabase para este sistema.
-2. En un proyecto Supabase nuevo, revisa y ejecuta `supabase/schema.sql`. Si ya tienes una base creada, respáldala y ejecuta `supabase/migrations/20261017000000_add_registration_seats.sql` antes de desplegar esta versión; no vuelvas a ejecutar todo el esquema sobre una base existente sin revisar conflictos.
+2. En un proyecto Supabase nuevo, revisa y ejecuta `supabase/schema.sql`. Si ya tienes una base creada, respáldala y aplica las migraciones que correspondan. Para la función de voluntarios y acreditación manual, ejecuta en el SQL Editor el archivo `supabase/migrations/20261119000000_add_volunteer_role_manual_checkin.sql` (una sola vez). No vuelvas a ejecutar todo el esquema sobre una base existente.
 3. En Authentication, crea la primera cuenta de usuario.
 4. Asigna rol administrador ejecutando, en una consulta separada, por ejemplo:
    ```sql
@@ -57,6 +57,18 @@ Después de actualizar el repositorio, despliegue la función en el proyecto Sup
 La función utiliza las variables de entorno administradas por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`). No copie la clave privilegiada a archivos del repositorio ni a variables públicas del sitio.
 
 No es necesario ejecutar una migración SQL adicional: el trigger `handle_new_user` existente crea el perfil y la función Edge asigna el rol solicitado. La contraseña solo se recibe durante la creación, no se escribe en los registros de auditoría ni se devuelve al frontend. El administrador debe entregarla al usuario por un canal seguro y verificar cuidadosamente el correo, ya que la cuenta se crea con ese correo confirmado para permitir acceso inmediato.
+## Rol Voluntarios y acreditación manual
+
+El rol `volunteer` solo muestra el módulo **Acreditación QR**. Puede seleccionar una actividad, consultar las personas inscritas y sus fila/asiento, acreditar manualmente con el botón **Acreditar** o utilizar el lector de cámara QR. No puede administrar usuarios, crear actividades, modificar inscripciones, eliminar registros ni asignar asientos.
+
+Para una base de datos existente, ejecute una sola vez en **Supabase → SQL Editor** el contenido de `supabase/migrations/20261119000000_add_volunteer_role_manual_checkin.sql`. Esta migración:
+- Amplía el conjunto de roles permitido en `profiles.role`.
+- Permite a `volunteer` leer actividades, asistentes, inscripciones y acreditaciones.
+- Autoriza a ese rol a validar QR y utilizar la función transaccional `manual_check_in_registration`.
+- Conserva las operaciones de gestión (crear, editar, cancelar, eliminar y asignar asientos) limitadas a `staff` y `admin`.
+
+El formulario de creación de usuarios permite seleccionar Personal, Voluntarios o Administrador. La Edge Function `admin-invite-user` debe desplegarse con el código actualizado para aceptar el rol `volunteer`. No es necesario modificar manualmente las filas existentes: el administrador puede cambiar el rol desde la tabla de usuarios.
+
 ## Plantilla del ticket
 - `ticket-template-original.html` es el archivo original adjunto, preservado sin modificaciones.
 - `src/ticket-template.js` conserva el markup del ticket y `src/ticket.css` define sus estilos compartidos para vista previa y exportación PDF.
