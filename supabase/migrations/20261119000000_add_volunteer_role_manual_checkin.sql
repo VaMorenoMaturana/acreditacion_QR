@@ -115,6 +115,8 @@ begin
 end;
 $$;
 
+revoke all on function public.check_in_ticket(uuid, uuid) from public;
+revoke all on function public.check_in_ticket(uuid, uuid) from anon;
 grant execute on function public.check_in_ticket(uuid, uuid) to authenticated;
 
 -- Manual accreditation by registration ID. The row lock prevents double check-in
