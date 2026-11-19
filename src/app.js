@@ -45,7 +45,7 @@ async function loadAll(){
   const [a,r,c,p]=await Promise.all([
     supabase.from("activities").select(activityFields).order("event_date",{ascending:false}),
     supabase.from("registrations").select(registrationFields).order("created_at",{ascending:false}),
-    supabase.from("check_ins").select("id,registration_id,activity_id,checked_in_at,registrations(attendees(full_name))").order("checked_in_at",{ascending:false}).limit(100),
+    supabase.from("check_ins").select("id,registration_id,activity_id,checked_in_at").order("checked_in_at",{ascending:false}).limit(100),
     supabase.from("profiles").select("id,email,role,created_at").order("created_at",{ascending:true})
   ]);
   for(const [name,res] of [["actividades",a],["inscripciones",r],["acreditaciones",c],["perfiles",p]]) if(res.error) console.warn(`Carga de ${name}:`,res.error.message);
@@ -99,7 +99,7 @@ function renderTicketRegistrationOptions(){
  renderTicketPreview();
 }
 function renderCheckins(){
- $("checkinTable").innerHTML=table(["Persona","Actividad","Fecha/hora"],checkins.slice(0,20).map(c=>`<tr><td>${escapeHtml(c.registrations?.attendees?.full_name||"Participante")}</td><td>${escapeHtml(selectedActivity(c.activity_id)?.name||"—")}</td><td>${escapeHtml(new Date(c.checked_in_at).toLocaleString("es-CL"))}</td></tr>`));
+ $("checkinTable").innerHTML=table(["Persona","Actividad","Fecha/hora"],checkins.slice(0,20).map(c=>`<tr><td>${escapeHtml(selectedRegistration(c.registration_id)?.attendee?.full_name||"Participante")}</td><td>${escapeHtml(selectedActivity(c.activity_id)?.name||"—")}</td><td>${escapeHtml(new Date(c.checked_in_at).toLocaleString("es-CL"))}</td></tr>`));
 }
 function renderManualCheckinList(){
  const host=$("manualCheckinList");
