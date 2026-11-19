@@ -14,7 +14,17 @@ const say = (id, message, bad=false) => { const el=$(id); if(el){el.textContent=
 const val = id => $(id).value.trim();
 const dateLabel = v => v ? new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(v+"T12:00:00Z")) : "—";
 const fileAsDataUrl = file => new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
-function setSignedIn(on){$("loginView").classList.toggle("hidden",on);$("appView").classList.toggle("hidden",!on);$("logoutBtn").classList.toggle("hidden",!on);$("userLabel").textContent=on?(currentUser?.email||""):"";}
+function setSignedIn(on){
+ $("loginView").classList.toggle("hidden",on);$("appView").classList.toggle("hidden",!on);$("logoutBtn").classList.toggle("hidden",!on);
+ $("userLabel").textContent=on?(currentUser?.email||""):"";
+ applyRoleNavigation();
+}
+function applyRoleNavigation(){
+ const volunteer=currentProfile?.role==="volunteer";
+ document.querySelectorAll(".tabs [data-tab],.tabs [data-goto]").forEach(button=>{
+  button.classList.toggle("hidden",volunteer&&button.dataset.tab!=="checkin");
+ });
+}
 function table(headers, rows){if(!rows.length)return '<p class="muted">Sin registros para mostrar.</p>';return `<table><thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;}
 function activityOptions(selectId, includeAll=false){const select=$(selectId);if(!select)return;const old=select.value;select.innerHTML=(includeAll?'<option value="">Todas las actividades</option>':'')+activities.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}${a.status==="closed"?" (cerrada)":""}</option>`).join("");if([...select.options].some(o=>o.value===old))select.value=old;}
 function selectedActivity(id){return activities.find(a=>a.id===id);}
@@ -27,11 +37,16 @@ function ticketDateLabel(value){
 }
 function ticketTime(value){return value?value.slice(0,5):"";}
 async function loadAll(){
+  const volunteer=currentProfile?.role==="volunteer";
+  const activityFields=volunteer?"id,name,event_date,status":"*";
+  const registrationFields=volunteer
+    ?"id,activity_id,attendee_id,seat_row,seat_number,status,created_at,attendees(full_name,email,organization)"
+    :"*, attendees(*)";
   const [a,r,c,p]=await Promise.all([
-    supabase.from("activities").select("*").order("event_date",{ascending:false}),
-    supabase.from("registrations").select("*, attendees(*)").order("created_at",{ascending:false}),
-    supabase.from("check_ins").select("*").order("checked_in_at",{ascending:false}).limit(100),
-    supabase.from("profiles").select("*").order("created_at",{ascending:true})
+    supabase.from("activities").select(activityFields).order("event_date",{ascending:false}),
+    supabase.from("registrations").select(registrationFields).order("created_at",{ascending:false}),
+    supabase.from("check_ins").select("id,registration_id,activity_id,checked_in_at,registrations(attendees(full_name))").order("checked_in_at",{ascending:false}).limit(100),
+    supabase.from("profiles").select("id,email,role,created_at").order("created_at",{ascending:true})
   ]);
   for(const [name,res] of [["actividades",a],["inscripciones",r],["acreditaciones",c],["perfiles",p]]) if(res.error) console.warn(`Carga de ${name}:`,res.error.message);
   activities=a.data||[];registrations=(r.data||[]).map(x=>({...x,attendee:x.attendees||{}}));const validRegistrationIds=new Set(registrations.map(x=>x.id));for(const id of selectedRegistrationIds)if(!validRegistrationIds.has(id))selectedRegistrationIds.delete(id);checkins=c.data||[];
@@ -44,7 +59,7 @@ function renderAll(){
   const recent=activities.slice(0,6).map(a=>`<tr><td>${escapeHtml(a.name)}</td><td>${dateLabel(a.event_date)}</td><td><span class="badge ${a.status==="open"?"good":"bad"}">${a.status==="open"?"Abierta":"Cerrada"}</span></td><td>${registrations.filter(r=>r.activity_id===a.id).length}</td></tr>`);
   $("recentActivities").innerHTML=table(["Actividad","Fecha","Estado","Inscripciones"],recent);
   $("activitiesTable").innerHTML=table(["Actividad","Fecha","Lugar","Estado","Acciones"],activities.map(a=>`<tr><td>${escapeHtml(a.name)}</td><td>${dateLabel(a.event_date)}</td><td>${escapeHtml(a.place)}</td><td>${a.status==="open"?"Abierta":"Cerrada"}</td><td><button class="secondary" data-edit-activity="${a.id}">Editar</button><button class="secondary" data-toggle-activity="${a.id}">${a.status==="open"?"Cerrar":"Reabrir"}</button></td></tr>`));
-  renderRegistrations();renderTicketRegistrationOptions();renderCheckins();
+  renderRegistrations();renderTicketRegistrationOptions();renderCheckins();renderManualCheckinList();
 }
 function visibleRegistrations(){
   const filter=$("registrationFilter").value;
@@ -80,12 +95,45 @@ function renderTicketRegistrationOptions(){
  renderTicketPreview();
 }
 function renderCheckins(){
- $("checkinTable").innerHTML=table(["Fecha/hora","Token","Estado"],checkins.slice(0,20).map(c=>`<tr><td>${escapeHtml(new Date(c.checked_in_at).toLocaleString("es-CL"))}</td><td>${escapeHtml(c.token||"—")}</td><td>Acreditada</td></tr>`));
+ $("checkinTable").innerHTML=table(["Persona","Actividad","Fecha/hora"],checkins.slice(0,20).map(c=>`<tr><td>${escapeHtml(c.registrations?.attendees?.full_name||"Participante")}</td><td>${escapeHtml(selectedActivity(c.activity_id)?.name||"—")}</td><td>${escapeHtml(new Date(c.checked_in_at).toLocaleString("es-CL"))}</td></tr>`));
+}
+function renderManualCheckinList(){
+ const host=$("manualCheckinList");
+ if(!host)return;
+ const activityId=val("checkinActivity");
+ if(!activityId){
+  $("manualCheckinCount").textContent="Seleccione una actividad para ver sus inscritos.";
+  host.innerHTML='<p class="muted">No hay una actividad seleccionada.</p>';return;
+ }
+ const all=registrations.filter(r=>r.activity_id===activityId);
+ const query=val("manualCheckinSearch").toLocaleLowerCase("es");
+ const list=all.filter(r=>{
+  const person=r.attendee||{};
+  const fields=[person.full_name,person.email,person.organization,r.seat_row,r.seat_number].join(" ").toLocaleLowerCase("es");
+  return fields.includes(query);
+ }).sort((a,b)=>(a.attendee?.full_name||"").localeCompare(b.attendee?.full_name||"","es"));
+ const accredited=all.filter(r=>r.status==="checked_in").length;
+ $("manualCheckinCount").textContent=`${list.length} personas visibles de ${all.length} inscritas · ${accredited} acreditadas`;
+ if(!list.length){
+  host.innerHTML='<p class="muted">No se encontraron personas para esta búsqueda y actividad.</p>';return;
+ }
+ const rows=list.map(r=>{
+  const status=r.status==="checked_in"
+   ?'<span class="badge good">Acreditada</span>'
+   :r.status==="cancelled"
+    ?'<span class="badge bad">Cancelada</span>'
+    :'<span class="badge warning">Pendiente</span>';
+  const action=r.status==="registered"
+   ?`<button class="primary manual-accredit-btn" type="button" data-manual-accredit="${r.id}">Acreditar</button>`
+   :`<button class="secondary" type="button" disabled>${r.status==="checked_in"?"Acreditada":"No disponible"}</button>`;
+  return `<tr><td><strong>${escapeHtml(r.attendee?.full_name||"Sin nombre")}</strong><div class="muted">${escapeHtml(r.attendee?.organization||"")}</div></td><td>${escapeHtml(r.attendee?.email||"—")}</td><td>${escapeHtml(r.seat_row||"—")}</td><td>${escapeHtml(r.seat_number||"—")}</td><td>${status}</td><td>${action}</td></tr>`;
+ }).join("");
+ host.innerHTML=`<table><thead><tr><th>Persona</th><th>Correo</th><th>Fila</th><th>Asiento</th><th>Estado</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function renderUsers(profiles){
  const admin=currentProfile?.role==="admin";
  $("adminTab").classList.toggle("hidden",!admin);
- $("usersTable").innerHTML=admin?table(["Correo","Rol","Acción"],profiles.map(p=>`<tr><td>${escapeHtml(p.email||p.id)}</td><td>${escapeHtml(p.role)}</td><td><select data-role-user="${p.id}"><option value="staff" ${p.role==="staff"?"selected":""}>Personal</option><option value="admin" ${p.role==="admin"?"selected":""}>Administrador</option></select><button class="secondary" data-save-role="${p.id}">Guardar rol</button></td></tr>`)):'<p class="muted">Se requiere rol administrador.</p>';
+ $("usersTable").innerHTML=admin?table(["Correo","Rol","Acción"],profiles.map(p=>`<tr><td>${escapeHtml(p.email||p.id)}</td><td>${escapeHtml(p.role)}</td><td><select data-role-user="${p.id}"><option value="staff" ${p.role==="staff"?"selected":""}>Personal</option><option value="volunteer" ${p.role==="volunteer"?"selected":""}>Voluntarios</option><option value="admin" ${p.role==="admin"?"selected":""}>Administrador</option></select><button class="secondary" data-save-role="${p.id}">Guardar rol</button></td></tr>`)):'<p class="muted">Se requiere rol administrador.</p>';
 }
 function clearActivityForm(){ $("activityForm").reset();$("activityId").value="";logoData={institution:"",project:"",partner:""}; }
 async function saveActivity(ev){
@@ -259,6 +307,28 @@ async function checkin(token){
  result.textContent=error?`Error de validación: ${error.message}`:(data?.message||"No se pudo validar la entrada.");
  await loadAll();
 }
+async function manualAccreditRegistration(id){
+ const registration=selectedRegistration(id);
+ const activityId=val("checkinActivity");
+ if(!registration||registration.activity_id!==activityId)return;
+ if(registration.status==="checked_in"){say("checkinResult","Esta persona ya está acreditada.");return;}
+ if(registration.status==="cancelled"){say("checkinResult","No se puede acreditar una inscripción cancelada.",true);return;}
+ if(!confirm(`¿Confirmar la acreditación manual de ${registration.attendee?.full_name||"esta persona"}? ${registration.seat_row||"Sin fila"} · Asiento ${registration.seat_number||"Sin asiento"}`))return;
+ const button=document.querySelector(`[data-manual-accredit="${id}"]`);
+ if(button){button.disabled=true;button.textContent="Acreditando…";}
+ const {data,error}=await supabase.rpc("manual_check_in_registration",{
+  p_registration_id:id,p_activity_id:activityId
+ });
+ if(error){
+  say("checkinResult",`No se pudo acreditar: ${error.message}`,true);
+  if(button){button.disabled=false;button.textContent="Acreditar";}
+  return;
+ }
+ const result=$("checkinResult");
+ result.className="checkin-result "+(data?.ok?"good":"bad");
+ result.textContent=data?.message||"No se pudo completar la acreditación manual.";
+ await loadAll();
+}
 async function startScanner(){
  if(!window.Html5Qrcode){say("checkinResult","No se cargó el lector QR; verifica la conexión a internet.",true);return;}
  try{scanner=new Html5Qrcode("qrReader");await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}},decoded=>{scanner.pause(true);checkin(decoded).finally(()=>setTimeout(()=>scanner?.resume(),1800));},()=>{});$("startScannerBtn").disabled=true;$("stopScannerBtn").disabled=false;}
@@ -328,10 +398,20 @@ async function createManagedUser(ev){
  }
 }
 async function saveRole(id){const role=document.querySelector(`[data-role-user="${id}"]`).value;const {error}=await supabase.from("profiles").update({role}).eq("id",id);if(error)alert(error.message);else await loadAll();}
-function switchTab(name){document.querySelectorAll(".tab-panel").forEach(x=>x.classList.add("hidden"));$("tab-"+name)?.classList.remove("hidden");document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));if(name==="tickets")resizeTicketPreview();}
+function switchTab(name){
+ if(currentProfile?.role==="volunteer")name="checkin";
+ document.querySelectorAll(".tab-panel").forEach(x=>x.classList.add("hidden"));
+ $("tab-"+name)?.classList.remove("hidden");
+ document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));
+ if(name==="tickets")resizeTicketPreview();
+}
 $("loginForm").addEventListener("submit",async ev=>{ev.preventDefault();say("loginMessage","Iniciando sesión…");if(!supabase){say("loginMessage","Configura Supabase en src/config.js.",true);return;}const {data,error}=await supabase.auth.signInWithPassword({email:val("loginEmail"),password:$("loginPassword").value});if(error){say("loginMessage",error.message,true);return;}currentUser=data.user;await afterLogin();});
 $("logoutBtn").addEventListener("click",async()=>{await stopScanner();await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);});
-async function afterLogin(){const {data,error}=await supabase.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();if(error||!data){say("loginMessage","La cuenta no tiene perfil autorizado. Solicita al administrador que la habilite.",true);await supabase.auth.signOut();return;}currentProfile=data;setSignedIn(true);await loadAll();switchTab("dashboard");}
+async function afterLogin(){
+ const {data,error}=await supabase.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();
+ if(error||!data){say("loginMessage","La cuenta no tiene perfil autorizado. Solicita al administrador que la habilite.",true);await supabase.auth.signOut();return;}
+ currentProfile=data;setSignedIn(true);await loadAll();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
+}
 $("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("createUserForm").addEventListener("submit",createManagedUser);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
 $("registrationFilter").addEventListener("change",()=>{selectedRegistrationIds.clear();renderRegistrations();say("bulkDeleteMessage","Selección reiniciada al cambiar el filtro.");});
 $("csvActivity").addEventListener("change",refreshCsvDuplicateWarnings);
@@ -348,9 +428,27 @@ $("registrationsTable").addEventListener("change",ev=>{
 $("deleteSelectedBtn").addEventListener("click",deleteSelectedRegistrations);
 $("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
 $("manualCheckinForm").addEventListener("submit",ev=>{ev.preventDefault();checkin(val("manualToken"));});$("startScannerBtn").addEventListener("click",startScanner);$("stopScannerBtn").addEventListener("click",stopScanner);
-document.addEventListener("click",ev=>{const t=ev.target.closest("[data-tab],[data-goto],[data-edit-activity],[data-toggle-activity],[data-ticket],[data-cancel],[data-delete],[data-save-role]");if(!t)return;if(t.dataset.goto==="auditorio"){const aid=val("registrationFilter")||val("registrationActivity")||activities[0]?.id||"";location.href="./auditorio.html"+(aid?"?activity="+encodeURIComponent(aid):"");return;}if(t.dataset.tab)switchTab(t.dataset.tab);if(t.dataset.goto)switchTab(t.dataset.goto);if(t.dataset.editActivity)editActivity(t.dataset.editActivity);if(t.dataset.toggleActivity)toggleActivity(t.dataset.toggleActivity);if(t.dataset.ticket){const r=selectedRegistration(t.dataset.ticket);if(r){$("ticketActivity").value=r.activity_id;renderTicketRegistrationOptions();$("ticketRegistration").value=r.id;renderTicketPreview();switchTab("tickets");}}if(t.dataset.cancel)cancelRegistration(t.dataset.cancel);if(t.dataset.delete)deleteRegistration(t.dataset.delete);if(t.dataset.saveRole)saveRole(t.dataset.saveRole);});
+document.addEventListener("click",ev=>{
+ const t=ev.target.closest("[data-tab],[data-goto],[data-edit-activity],[data-toggle-activity],[data-ticket],[data-cancel],[data-delete],[data-save-role],[data-manual-accredit]");
+ if(!t)return;
+ if(t.dataset.goto==="auditorio"){
+  if(currentProfile?.role==="volunteer")return;
+  const aid=val("registrationFilter")||val("registrationActivity")||activities[0]?.id||"";
+  location.href="./auditorio.html"+(aid?"?activity="+encodeURIComponent(aid):"");return;
+ }
+ if(t.dataset.tab)switchTab(t.dataset.tab);
+ if(t.dataset.goto)switchTab(t.dataset.goto);
+ if(t.dataset.editActivity)editActivity(t.dataset.editActivity);
+ if(t.dataset.toggleActivity)toggleActivity(t.dataset.toggleActivity);
+ if(t.dataset.ticket){const r=selectedRegistration(t.dataset.ticket);if(r){$("ticketActivity").value=r.activity_id;renderTicketRegistrationOptions();$("ticketRegistration").value=r.id;renderTicketPreview();switchTab("tickets");}}
+ if(t.dataset.cancel)cancelRegistration(t.dataset.cancel);
+ if(t.dataset.delete)deleteRegistration(t.dataset.delete);
+ if(t.dataset.saveRole)saveRole(t.dataset.saveRole);
+ if(t.dataset.manualAccredit)manualAccreditRegistration(t.dataset.manualAccredit);
+});
 for(const [input,key] of [["activityLogo","institution"],["projectLogo","project"],["partnerLogo","partner"]])$(input).addEventListener("change",async ev=>{const f=ev.target.files?.[0];if(!f)return;if(!f.type.startsWith("image/")){say("activityMessage","Selecciona un archivo de imagen.",true);return;}if(f.size>1_500_000){say("activityMessage","El logotipo supera 1,5 MB. Reduce su tamaño antes de subirlo.",true);return;}logoData[key]=await fileAsDataUrl(f);});
 $("ticketActivity").addEventListener("change",()=>{activityOptions("ticketActivity");renderTicketRegistrationOptions();});
-$("checkinActivity").addEventListener("change",()=>{});
+$("checkinActivity").addEventListener("change",renderManualCheckinList);
+$("manualCheckinSearch").addEventListener("input",renderManualCheckinList);
 $("adminTab").addEventListener("click",()=>{if(currentProfile?.role!=="admin")switchTab("dashboard");});
 if(supabase){supabase.auth.getSession().then(async({data})=>{if(data.session){currentUser=data.session.user;await afterLogin();}});supabase.auth.onAuthStateChange((_event,session)=>{if(!session){currentUser=null;currentProfile=null;setSignedIn(false);}});}
