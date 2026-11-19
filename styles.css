@@ -18,3 +18,10 @@
 .csv-excluded{opacity:.55;background:#f5f3f5}
 .csv-row-error{font-size:11px;color:#9b2828;margin-top:4px;max-width:240px}
 #csvPreview table{min-width:850px}
+
+
+/* Manual attendee accreditation */
+.manual-accredit-btn{white-space:nowrap;min-width:96px}
+#manualCheckinList table{min-width:680px}
+#manualCheckinList th,#manualCheckinList td{vertical-align:middle}
+#manualCheckinSearch{margin-top:4px}
