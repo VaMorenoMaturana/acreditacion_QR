@@ -98,11 +98,28 @@
     <div class="panel"><h2>Vista previa</h2><div id="ticketPreview" class="ticket-preview"></div></div>
   </section>
   <section id="tab-checkin" class="tab-panel hidden">
-    <div class="page-head"><div><h1>Acreditación QR</h1><p class="muted">Requiere conexión a internet para validar cada entrada contra Supabase.</p></div></div>
-    <div class="panel"><label>Actividad<select id="checkinActivity"></select></label><div class="form-actions"><button id="startScannerBtn" class="primary">Activar cámara</button><button id="stopScannerBtn" class="secondary" disabled>Detener cámara</button></div><div id="qrReader"></div>
-      <div class="divider"></div><form id="manualCheckinForm" class="form-grid"><label class="span-2">Código de entrada (alternativa manual)<input id="manualToken" autocomplete="off" placeholder="Pegar token del QR"></label><div class="form-actions span-2"><button class="primary" type="submit">Validar y acreditar</button></div></form>
+    <div class="page-head"><div><h1>Acreditación QR</h1><p class="muted">Acredite participantes escaneando su entrada o buscándolos en el listado.</p></div></div>
+    <div class="panel"><label>Actividad<select id="checkinActivity"></select></label></div>
+    <div class="panel">
+      <h2>Acreditación mediante QR</h2>
+      <p class="muted">Active la cámara para leer el código QR de la entrada. También puede ingresar manualmente el token impreso o disponible en el código.</p>
+      <div class="form-actions"><button id="startScannerBtn" class="primary">Activar cámara</button><button id="stopScannerBtn" class="secondary" disabled>Detener cámara</button></div>
+      <div id="qrReader"></div>
+      <div class="divider"></div>
+      <form id="manualCheckinForm" class="form-grid">
+        <label class="span-2">Código de entrada / token<input id="manualToken" autocomplete="off" placeholder="Pegar token del QR"></label>
+        <div class="form-actions span-2"><button class="primary" type="submit">Validar y acreditar</button></div>
+      </form>
       <div id="checkinResult" class="checkin-result" role="status" aria-live="polite"></div>
-    </div><div class="panel"><h2>Últimas acreditaciones</h2><div id="checkinTable" class="table-wrap"></div></div>
+    </div>
+    <div class="panel">
+      <h2>Acreditación manual</h2>
+      <p class="muted">Busque a la persona en el listado y presione «Acreditar». Se registrará la acreditación sin necesidad de escanear el QR.</p>
+      <label>Buscar persona<input id="manualCheckinSearch" type="search" autocomplete="off" placeholder="Nombre, correo u organización"></label>
+      <p id="manualCheckinCount" class="muted">Seleccione una actividad para ver sus inscritos.</p>
+      <div id="manualCheckinList" class="table-wrap"></div>
+    </div>
+    <div class="panel"><h2>Últimas acreditaciones</h2><div id="checkinTable" class="table-wrap"></div></div>
   </section>
   <section id="tab-admin" class="tab-panel hidden">
     <div class="page-head"><div><h1>Administración</h1><p class="muted">Gestión de usuarios y roles. Solo administradores.</p></div></div>
@@ -113,7 +130,7 @@
         <label class="span-2">Cuenta / correo electrónico *<input id="createUserEmail" type="email" autocomplete="off" maxlength="254" required placeholder="persona@institucion.cl"></label>
         <label>Contraseña *<input id="createUserPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required placeholder="Mínimo 8 caracteres"></label>
         <label>Confirmar contraseña *<input id="createUserPasswordConfirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" required placeholder="Repita la contraseña"></label>
-        <label>Rol de acceso<select id="createUserRole"><option value="staff">Personal</option><option value="admin">Administrador</option></select></label>
+        <label>Rol de acceso<select id="createUserRole"><option value="staff">Personal</option><option value="volunteer">Voluntarios</option><option value="admin">Administrador</option></select></label>
         <div class="form-actions"><button class="primary" type="submit">Crear cuenta</button></div>
       </form>
       <p id="createUserMessage" class="message" role="status"></p>
