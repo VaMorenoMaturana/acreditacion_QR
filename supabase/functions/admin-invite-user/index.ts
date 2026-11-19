@@ -29,7 +29,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(401, { error: "Debe iniciar sesión para realizar esta acción." });
     }
 
-    // Validar el JWT del usuario que realiza la solicitud.
+    // Valida el JWT del administrador que realiza la solicitud.
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authorization } },
       auth: { persistSession: false, autoRefreshToken: false },
@@ -50,10 +50,10 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (profileError || callerProfile?.role !== "admin") {
-      return jsonResponse(403, { error: "Solo un administrador puede invitar usuarios." });
+      return jsonResponse(403, { error: "Solo un administrador puede crear cuentas." });
     }
 
-    let payload: { email?: unknown; role?: unknown };
+    let payload: { email?: unknown; password?: unknown; role?: unknown };
     try {
       payload = await req.json();
     } catch {
@@ -61,57 +61,65 @@ Deno.serve(async (req: Request) => {
     }
 
     const email = String(payload.email ?? "").trim().toLowerCase();
+    const password = typeof payload.password === "string" ? payload.password : "";
     const role = payload.role;
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
       return jsonResponse(400, { error: "Ingrese una dirección de correo válida." });
+    }
+    if (password.length < 8 || password.length > 128) {
+      return jsonResponse(400, { error: "La contraseña debe tener entre 8 y 128 caracteres." });
     }
     if (role !== "staff" && role !== "admin") {
       return jsonResponse(400, { error: "El rol seleccionado no es válido." });
     }
-    if (email === String(callerData.user.email ?? "").toLowerCase()) {
-      return jsonResponse(400, { error: "No puede invitar su propia cuenta." });
-    }
 
-    const { data: inviteData, error: inviteError } =
-      await adminClient.auth.admin.inviteUserByEmail(email);
+    // Crear la cuenta directamente y confirmar el correo para habilitar el acceso inmediato.
+    // createUser no envía invitaciones ni correos de confirmación.
+    const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
 
-    if (inviteError || !inviteData.user) {
-      const message = inviteError?.message || "No fue posible crear la invitación.";
+    if (createError || !createData.user) {
+      const message = createError?.message || "No fue posible crear la cuenta.";
       return jsonResponse(400, { error: message });
     }
 
-    const invitedUser = inviteData.user;
+    const newUser = createData.user;
+    // El trigger handle_new_user crea un perfil staff; se asigna aquí el rol solicitado.
     const { error: saveProfileError } = await adminClient
       .from("profiles")
       .upsert(
-        { id: invitedUser.id, email: invitedUser.email ?? email, role },
+        { id: newUser.id, email: newUser.email ?? email, role },
         { onConflict: "id" },
       );
 
     if (saveProfileError) {
-      // Evita dejar una cuenta creada sin el rol solicitado.
-      await adminClient.auth.admin.deleteUser(invitedUser.id);
-      console.error("No se pudo guardar el perfil del usuario invitado:", saveProfileError.message);
-      return jsonResponse(500, { error: "Se creó la invitación, pero no se pudo asignar el rol. La cuenta fue revertida; vuelva a intentarlo." });
+      await adminClient.auth.admin.deleteUser(newUser.id);
+      console.error("No se pudo guardar el perfil de la nueva cuenta:", saveProfileError.message);
+      return jsonResponse(500, { error: "No se pudo asignar el rol. La cuenta fue revertida; vuelva a intentarlo." });
     }
 
+    // Nunca registrar la contraseña en auditoría ni devolverla al navegador.
     const { error: auditError } = await adminClient.from("audit_logs").insert({
       actor_id: callerData.user.id,
-      action: "user_invited",
+      action: "user_created",
       entity_type: "user",
-      entity_id: invitedUser.id,
+      entity_id: newUser.id,
       details: { email, role },
     });
-    if (auditError) console.warn("No se pudo registrar la auditoría de la invitación:", auditError.message);
+    if (auditError) console.warn("No se pudo registrar la auditoría de la cuenta:", auditError.message);
 
     return jsonResponse(200, {
       success: true,
       email,
       role,
-      message: "Invitación enviada. El usuario debe abrir el correo y definir su contraseña.",
+      message: "Cuenta creada y habilitada. El usuario ya puede iniciar sesión con el correo y la contraseña asignada.",
     });
   } catch (error) {
-    console.error("Error al invitar usuario:", error);
-    return jsonResponse(500, { error: "Ocurrió un error interno al procesar la invitación." });
+    console.error("Error al crear cuenta de usuario:", error);
+    return jsonResponse(500, { error: "Ocurrió un error interno al crear la cuenta." });
   }
 });
