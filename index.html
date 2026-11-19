@@ -105,9 +105,19 @@
     </div><div class="panel"><h2>Últimas acreditaciones</h2><div id="checkinTable" class="table-wrap"></div></div>
   </section>
   <section id="tab-admin" class="tab-panel hidden">
-    <div class="page-head"><div><h1>Administración</h1><p class="muted">Gestión de roles. Solo administradores.</p></div></div>
-    <div class="panel"><h2>Usuarios registrados</h2><p class="muted">Crea usuarios desde Supabase Authentication. Luego asigna aquí el rol de personal o administrador.</p><div id="usersTable" class="table-wrap"></div></div>
-    <div class="panel"><h2>Notas de seguridad</h2><ul><li>Usa solo la clave pública/anon de Supabase en el navegador.</li><li>Las políticas RLS del esquema limitan los datos a usuarios autenticados y el check-in usa una función transaccional.</li><li>Activa MFA en las cuentas administrativas cuando esté disponible para tu proyecto.</li></ul></div>
+    <div class="page-head"><div><h1>Administración</h1><p class="muted">Gestión de usuarios y roles. Solo administradores.</p></div></div>
+    <div class="panel">
+      <h2>Invitar nuevo usuario</h2>
+      <p class="muted">Ingrese el correo de la persona y elija su rol. Recibirá un correo de invitación para validar su dirección y definir su propia contraseña.</p>
+      <form id="inviteUserForm" class="form-grid">
+        <label class="span-2">Correo electrónico *<input id="inviteEmail" type="email" autocomplete="off" maxlength="254" required placeholder="persona@institucion.cl"></label>
+        <label>Rol de acceso<select id="inviteRole"><option value="staff">Personal</option><option value="admin">Administrador</option></select></label>
+        <div class="form-actions"><button class="primary" type="submit">Enviar invitación</button></div>
+      </form>
+      <p id="inviteUserMessage" class="message" role="status"></p>
+    </div>
+    <div class="panel"><h2>Usuarios registrados</h2><p class="muted">Cambie el rol de acceso de las cuentas existentes desde esta tabla.</p><div id="usersTable" class="table-wrap"></div></div>
+    <div class="panel"><h2>Notas de seguridad</h2><ul><li>La creación de cuentas se ejecuta en una función segura de Supabase; la clave privilegiada nunca se expone en el navegador.</li><li>Configure SMTP en Supabase Authentication para asegurar la entrega de invitaciones por correo.</li><li>Asigne el rol de administrador solo a personas que realmente deban gestionar usuarios y permisos.</li><li>Active MFA en las cuentas administrativas cuando esté disponible para su proyecto.</li></ul></div>
   </section>
 </section>
 </main>
