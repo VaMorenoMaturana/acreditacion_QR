@@ -5,7 +5,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
-  role text not null default 'staff' check (role in ('staff','admin')),
+  role text not null default 'staff' check (role in ('staff','admin','volunteer')),
   created_at timestamptz not null default now()
 );
 
@@ -81,6 +81,12 @@ create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path=public
 as $$ select exists(select 1 from public.profiles p where p.id=auth.uid() and p.role='admin'); $$;
 
+-- Volunteers can read accreditation data and execute accreditation functions only.
+-- is_staff() remains restricted to staff/admin for operational write permissions.
+create or replace function public.is_accreditor()
+returns boolean language sql stable security definer set search_path=public
+as $$ select exists(select 1 from public.profiles p where p.id=auth.uid() and p.role in ('staff','admin','volunteer')); $$;
+
 -- Crear el perfil automáticamente para cada usuario creado en Supabase Auth.
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path=public
@@ -108,26 +114,26 @@ drop policy if exists "admin manages profiles" on public.profiles;
 create policy "admin manages profiles" on public.profiles for update to authenticated using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "staff reads activities" on public.activities;
-create policy "staff reads activities" on public.activities for select to authenticated using (public.is_staff());
+create policy "accreditors read activities" on public.activities for select to authenticated using (public.is_accreditor());
 drop policy if exists "staff inserts activities" on public.activities;
 create policy "staff inserts activities" on public.activities for insert to authenticated with check (public.is_staff());
 drop policy if exists "staff updates activities" on public.activities;
 create policy "staff updates activities" on public.activities for update to authenticated using (public.is_staff()) with check (public.is_staff());
 
 drop policy if exists "staff reads attendees" on public.attendees;
-create policy "staff reads attendees" on public.attendees for select to authenticated using (public.is_staff());
+create policy "accreditors read attendees" on public.attendees for select to authenticated using (public.is_accreditor());
 drop policy if exists "staff inserts attendees" on public.attendees;
 create policy "staff inserts attendees" on public.attendees for insert to authenticated with check (public.is_staff());
 drop policy if exists "staff updates attendees" on public.attendees;
 create policy "staff updates attendees" on public.attendees for update to authenticated using (public.is_staff()) with check (public.is_staff());
 
 drop policy if exists "staff reads registrations" on public.registrations;
-create policy "staff reads registrations" on public.registrations for select to authenticated using (public.is_staff());
+create policy "accreditors read registrations" on public.registrations for select to authenticated using (public.is_accreditor());
 drop policy if exists "staff updates registrations" on public.registrations;
 create policy "staff updates registrations" on public.registrations for update to authenticated using (public.is_staff()) with check (public.is_staff());
 
 drop policy if exists "staff reads checkins" on public.check_ins;
-create policy "staff reads checkins" on public.check_ins for select to authenticated using (public.is_staff());
+create policy "accreditors read checkins" on public.check_ins for select to authenticated using (public.is_accreditor());
 drop policy if exists "staff reads audit" on public.audit_logs;
 create policy "staff reads audit" on public.audit_logs for select to authenticated using (public.is_staff());
 
@@ -161,7 +167,7 @@ returns jsonb language plpgsql security definer set search_path=public
 as $$
 declare v_reg public.registrations%rowtype; v_name text; v_activity text;
 begin
- if not public.is_staff() then raise exception 'No autorizado'; end if;
+ if not public.is_accreditor() then raise exception 'No autorizado'; end if;
  select r.* into v_reg from public.registrations r where r.qr_token=p_token for update;
  if not found then return jsonb_build_object('ok',false,'message','QR no reconocido'); end if;
  if p_activity_id is not null and v_reg.activity_id<>p_activity_id then return jsonb_build_object('ok',false,'message','Esta entrada pertenece a otra actividad'); end if;
@@ -170,13 +176,34 @@ begin
  select a.full_name, act.name into v_name,v_activity from public.attendees a join public.activities act on act.id=v_reg.activity_id where a.id=v_reg.attendee_id;
  update public.registrations set status='checked_in' where id=v_reg.id;
  insert into public.check_ins(registration_id,activity_id,token,checked_in_by) values(v_reg.id,v_reg.activity_id,v_reg.qr_token,auth.uid());
- insert into public.audit_logs(actor_id,action,entity_type,entity_id,details) values(auth.uid(),'checkin_success','registration',v_reg.id::text,jsonb_build_object('activity_id',v_reg.activity_id));
+ insert into public.audit_logs(actor_id,action,entity_type,entity_id,details) values(auth.uid(),'checkin_success','registration',v_reg.id::text,jsonb_build_object('activity_id',v_reg.activity_id,'method','qr'));
  return jsonb_build_object('ok',true,'message','Acreditación válida: '||v_name||' · '||v_activity);
+end;
+$$;
+
+create or replace function public.manual_check_in_registration(p_registration_id uuid,p_activity_id uuid)
+returns jsonb language plpgsql security definer set search_path=public
+as $$
+declare v_reg public.registrations%rowtype; v_name text; v_activity text;
+begin
+ if not public.is_accreditor() then raise exception 'No autorizado'; end if;
+ select r.* into v_reg from public.registrations r where r.id=p_registration_id and r.activity_id=p_activity_id for update;
+ if not found then return jsonb_build_object('ok',false,'message','No se encontró esta inscripción en la actividad seleccionada'); end if;
+ if v_reg.status='cancelled' then return jsonb_build_object('ok',false,'message','La inscripción está cancelada'); end if;
+ if v_reg.status='checked_in' then return jsonb_build_object('ok',false,'message','Esta persona ya fue acreditada'); end if;
+ select a.full_name, act.name into v_name,v_activity from public.attendees a join public.activities act on act.id=v_reg.activity_id where a.id=v_reg.attendee_id;
+ update public.registrations set status='checked_in' where id=v_reg.id;
+ insert into public.check_ins(registration_id,activity_id,token,checked_in_by) values(v_reg.id,v_reg.activity_id,v_reg.qr_token,auth.uid());
+ insert into public.audit_logs(actor_id,action,entity_type,entity_id,details) values(auth.uid(),'checkin_success','registration',v_reg.id::text,jsonb_build_object('activity_id',v_reg.activity_id,'method','manual'));
+ return jsonb_build_object('ok',true,'message','Acreditación manual registrada: '||v_name||' · '||v_activity);
 end;
 $$;
 
 grant execute on function public.register_attendee(uuid,text,text,text,text,text) to authenticated;
 grant execute on function public.check_in_ticket(uuid,uuid) to authenticated;
+revoke all on function public.manual_check_in_registration(uuid,uuid) from public;
+revoke all on function public.manual_check_in_registration(uuid,uuid) from anon;
+grant execute on function public.manual_check_in_registration(uuid,uuid) to authenticated;
 notify pgrst, 'reload schema';
 
 -- Para asignar el primer administrador: crea primero el usuario en Authentication y luego ejecuta:
