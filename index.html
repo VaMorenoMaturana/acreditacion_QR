@@ -107,14 +107,17 @@
   <section id="tab-admin" class="tab-panel hidden">
     <div class="page-head"><div><h1>Administración</h1><p class="muted">Gestión de usuarios y roles. Solo administradores.</p></div></div>
     <div class="panel">
-      <h2>Invitar nuevo usuario</h2>
-      <p class="muted">Ingrese el correo de la persona y elija su rol. Recibirá un correo de invitación para validar su dirección y definir su propia contraseña.</p>
-      <form id="inviteUserForm" class="form-grid">
-        <label class="span-2">Correo electrónico *<input id="inviteEmail" type="email" autocomplete="off" maxlength="254" required placeholder="persona@institucion.cl"></label>
-        <label>Rol de acceso<select id="inviteRole"><option value="staff">Personal</option><option value="admin">Administrador</option></select></label>
-        <div class="form-actions"><button class="primary" type="submit">Enviar invitación</button></div>
+      <h2>Crear cuenta de usuario</h2>
+      <p class="muted">El correo será el nombre de usuario para iniciar sesión. Defina una contraseña y asigne el nivel de acceso. La cuenta quedará habilitada de inmediato; no se enviará una invitación por correo.</p>
+      <form id="createUserForm" class="form-grid">
+        <label class="span-2">Cuenta / correo electrónico *<input id="createUserEmail" type="email" autocomplete="off" maxlength="254" required placeholder="persona@institucion.cl"></label>
+        <label>Contraseña *<input id="createUserPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required placeholder="Mínimo 8 caracteres"></label>
+        <label>Confirmar contraseña *<input id="createUserPasswordConfirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" required placeholder="Repita la contraseña"></label>
+        <label>Rol de acceso<select id="createUserRole"><option value="staff">Personal</option><option value="admin">Administrador</option></select></label>
+        <div class="form-actions"><button class="primary" type="submit">Crear cuenta</button></div>
       </form>
-      <p id="inviteUserMessage" class="message" role="status"></p>
+      <p id="createUserMessage" class="message" role="status"></p>
+      <p class="muted">La contraseña no se muestra ni se almacena en esta aplicación. Entréguela al usuario por un canal seguro. Verifique cuidadosamente el correo: la cuenta se crea con el correo confirmado para permitir el acceso inmediato.</p>
     </div>
     <div class="panel"><h2>Usuarios registrados</h2><p class="muted">Cambie el rol de acceso de las cuentas existentes desde esta tabla.</p><div id="usersTable" class="table-wrap"></div></div>
     <div class="panel"><h2>Notas de seguridad</h2><ul><li>La creación de cuentas se ejecuta en una función segura de Supabase; la clave privilegiada nunca se expone en el navegador.</li><li>Configure SMTP en Supabase Authentication para asegurar la entrega de invitaciones por correo.</li><li>Asigne el rol de administrador solo a personas que realmente deban gestionar usuarios y permisos.</li><li>Active MFA en las cuentas administrativas cuando esté disponible para su proyecto.</li></ul></div>
