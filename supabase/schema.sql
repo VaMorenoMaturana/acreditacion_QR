@@ -200,6 +200,8 @@ end;
 $$;
 
 grant execute on function public.register_attendee(uuid,text,text,text,text,text) to authenticated;
+revoke all on function public.check_in_ticket(uuid,uuid) from public;
+revoke all on function public.check_in_ticket(uuid,uuid) from anon;
 grant execute on function public.check_in_ticket(uuid,uuid) to authenticated;
 revoke all on function public.manual_check_in_registration(uuid,uuid) from public;
 revoke all on function public.manual_check_in_registration(uuid,uuid) from anon;
