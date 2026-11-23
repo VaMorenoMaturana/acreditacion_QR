@@ -45,12 +45,12 @@ Deno.serve(async (req: Request) => {
     });
     const { data: callerProfile, error: profileError } = await adminClient
       .from("profiles")
-      .select("role")
+      .select("role,organization_id")
       .eq("id", callerData.user.id)
       .maybeSingle();
 
-    if (profileError || callerProfile?.role !== "admin") {
-      return jsonResponse(403, { error: "Solo un administrador puede crear cuentas." });
+    if (profileError || callerProfile?.role !== "admin" || !callerProfile.organization_id) {
+      return jsonResponse(403, { error: "Solo el administrador de una organización puede crear cuentas." });
     }
 
     let payload: { email?: unknown; password?: unknown; role?: unknown };
@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
     const { error: saveProfileError } = await adminClient
       .from("profiles")
       .upsert(
-        { id: newUser.id, email: newUser.email ?? email, role },
+        { id: newUser.id, email: newUser.email ?? email, role, organization_id: callerProfile.organization_id },
         { onConflict: "id" },
       );
 
@@ -104,6 +104,7 @@ Deno.serve(async (req: Request) => {
 
     // Nunca registrar la contraseña en auditoría ni devolverla al navegador.
     const { error: auditError } = await adminClient.from("audit_logs").insert({
+      organization_id: callerProfile.organization_id,
       actor_id: callerData.user.id,
       action: "user_created",
       entity_type: "user",
