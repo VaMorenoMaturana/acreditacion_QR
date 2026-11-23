@@ -13,6 +13,7 @@ let editMode = false;
 let direction = "left_to_right";
 let activeActivityId = null;
 let activeTemplateId = null;
+let currentRole = null;
 let activeLayout = null;
 let editorRows = [];
 
@@ -306,7 +307,7 @@ function renderTemplateOptions() {
   $("auditoriumSelect").innerHTML = '<option value="">Seleccione una plantilla…</option>' +
     templates.map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join("");
   if (templates.some(template => template.id === old)) $("auditoriumSelect").value = old;
-  $("deleteAuditoriumBtn").disabled = !templates.length || !templates.some(item => item.id === $("auditoriumSelect").value);
+  $("deleteAuditoriumBtn").disabled = currentRole !== "admin" || !templates.length || !templates.some(item => item.id === $("auditoriumSelect").value);
 }
 
 function renderActivityOptions() {
@@ -485,7 +486,8 @@ async function saveNewTemplate() {
     await applySelectedTemplate();
     setStatus(`Auditorio «${data.name}» guardado y asignado a esta actividad.`);
   } else {
-    setStatus(`Auditorio «${data.name}» guardado para reutilizarlo en otras actividades.`);
+    $("auditoriumSelect").value = activeTemplateId || "";
+    setStatus(`Auditorio «${data.name}» guardado para reutilizarlo. Esta actividad conserva su plantilla actual porque ya tiene asientos asignados.`);
   }
 }
 
@@ -588,6 +590,7 @@ async function loadSession() {
     $("peopleList").innerHTML = '<div class="empty">Acceso no autorizado. Vuelva a Espacio Acredita.</div>';
     return;
   }
+  currentRole = profile.role;
   $("userLabel").textContent = [data.session.user.email, profile.organizations?.name].filter(Boolean).join(" · ");
 
   const [activityResult, templateResult] = await Promise.all([
