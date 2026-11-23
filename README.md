@@ -110,9 +110,9 @@ Luis Prueba,luis@example.cl,Organización Prueba,,
 El importador valida campos y duplicados dentro del archivo; la base de datos evita duplicar la misma inscripción para una misma persona. Para producción se recomienda acordar la regla de deduplicación de personas y probar CSV exportados de los sistemas reales.
 
 ## Límites conocidos de esta versión
-- No se envían correos automáticamente.
+- No se envían correos transaccionales a los inscritos; Supabase Auth puede enviar el correo de confirmación del registro público si está habilitado.
 - La acreditación requiere conexión activa a Supabase; no hay modo offline.
-- No incluye registro público, certificados, integraciones externas ni check-out.
+- No incluye certificados, integraciones externas ni check-out.
 - Los logotipos se almacenan como data URL en registros de actividad; para uso sostenido conviene migrarlos a Supabase Storage con límites de tamaño y permisos.
 - La importación CSV es secuencial y está pensada para lotes pequeños/medianos; probar el volumen real.
 - La auditoría está iniciada, pero no todos los cambios quedan auditados aún.
@@ -125,6 +125,16 @@ El importador valida campos y duplicados dentro del archivo; la base de datos ev
 - Definir aviso de privacidad, base de legitimación, retención y procedimiento de eliminación antes de cargar datos personales reales.
 - La política inicial de perfiles permite que cada usuario vea su propio perfil y que administradores vean todos; el alta automática crea rol `staff`.
 - Las funciones `SECURITY DEFINER` y políticas deben revisarse en un entorno de prueba antes de usar datos reales.
+
+## Verificación de aislamiento antes de producción
+
+En un proyecto de prueba, cree dos organizaciones con cuentas distintas. En cada una cree una actividad, una inscripción y una plantilla de auditorio. Inicie sesión alternadamente y compruebe que cada organización solo ve sus propios registros, usuarios y auditorios. También pruebe que una cuenta de una organización no pueda consultar por API el identificador de una actividad o plantilla de la otra.
+
+Compruebe además:
+- Que el administrador inicial de cada organización puede crear usuarios dentro de su propio espacio.
+- Que un voluntario solo puede entrar a Acreditación QR y no puede acceder al módulo de auditorios.
+- Que cambiar una plantilla o la dirección de numeración se bloquea cuando la actividad conserva asientos asignados.
+- Que una acreditación manual y una por QR dejan el mismo estado final y no permiten un segundo check-in.
 
 ## Despliegue Render
 - New > Static Site.
