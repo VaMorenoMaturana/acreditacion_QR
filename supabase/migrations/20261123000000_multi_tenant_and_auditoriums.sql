@@ -108,7 +108,7 @@ create table if not exists public.auditorium_templates (
   name text not null check (char_length(btrim(name)) between 2 and 120),
   description text,
   layout jsonb not null,
-  created_by uuid not null default auth.uid() references auth.users(id),
+  created_by uuid default auth.uid() references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
