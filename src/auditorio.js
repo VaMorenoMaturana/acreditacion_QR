@@ -497,7 +497,7 @@ async function deleteSelectedTemplate() {
   if (!template) return;
   const used = activities.filter(activity => activity.auditorium_template_id === templateId);
   if (used.length) {
-    alert(`No se puede eliminar «${template.name}`: está asignado a ${used.length} actividad(es). Cambie primero el auditorio de esas actividades.`);
+    alert(`No se puede eliminar «${template.name}»: está asignado a ${used.length} actividad(es). Cambie primero el auditorio de esas actividades.`);
     return;
   }
   if (!confirm(`¿Eliminar definitivamente la plantilla «${template.name}»? Las asignaciones de las actividades no se modificarán.`)) return;
