@@ -21,13 +21,32 @@
   <h2>Configuración pendiente</h2><p>Agrega la URL y la clave pública (anon/publishable) de tu proyecto Supabase en <code>src/config.js</code>. Nunca uses una clave <code>service_role</code> en el navegador.</p>
 </section>
 <section id="loginView" class="auth panel">
-  <h1>Acceso interno</h1><p class="muted">Solo personal autorizado puede gestionar actividades y acreditaciones.</p>
+  <h1>Acceso a Espacio Acredita</h1><p class="muted">Ingrese con las credenciales de su organización.</p>
   <form id="loginForm">
-    <label>Correo institucional<input id="loginEmail" type="email" autocomplete="username" required></label>
+    <label>Correo electrónico<input id="loginEmail" type="email" autocomplete="username" required></label>
     <label>Contraseña<input id="loginPassword" type="password" autocomplete="current-password" required></label>
     <button class="primary" type="submit">Iniciar sesión</button>
     <p id="loginMessage" class="message" role="status"></p>
   </form>
+  <div class="divider"></div>
+  <p class="muted">¿Aún no tiene una cuenta?</p>
+  <button id="showSignupBtn" class="secondary" type="button">Crear cuenta y organización</button>
+</section>
+<section id="signupView" class="auth panel hidden">
+  <h1>Crear cuenta</h1>
+  <p class="muted">Registre sus datos y cree el espacio de trabajo de su empresa u organización.</p>
+  <form id="signupForm" class="auth-form">
+    <label>Nombre completo<input id="signupFullName" maxlength="180" autocomplete="name" required></label>
+    <label>Correo electrónico<input id="signupEmail" type="email" maxlength="254" autocomplete="email" required></label>
+    <label>Contraseña<input id="signupPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label>
+    <label>Confirmar contraseña<input id="signupPasswordConfirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label>
+    <label>Dominio / organización<input id="signupOrganization" maxlength="180" required placeholder="Nombre de su empresa u organización"></label>
+    <p class="muted">Este dominio será su espacio de trabajo privado dentro de la plataforma. Agrupará sus actividades, usuarios, inscritos y auditorios. No es un dominio web ni una dirección DNS.</p>
+    <button class="primary" type="submit">Crear mi organización</button>
+    <p id="signupMessage" class="message" role="status"></p>
+  </form>
+  <div class="divider"></div>
+  <button id="showLoginBtn" class="secondary" type="button">Volver al inicio de sesión</button>
 </section>
 <section id="appView" class="hidden">
   <nav class="tabs" aria-label="Módulos">
