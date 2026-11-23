@@ -115,6 +115,9 @@ create table if not exists public.auditorium_templates (
 
 create unique index if not exists auditorium_templates_org_name_unique
   on public.auditorium_templates (organization_id, lower(name));
+create index if not exists profiles_organization_id_idx
+  on public.profiles(organization_id);
+
 create index if not exists activities_organization_id_idx
   on public.activities(organization_id);
 create index if not exists attendees_organization_id_idx
@@ -266,6 +269,12 @@ revoke all on function public.is_accreditor() from public, anon;
 grant execute on function public.is_staff() to authenticated;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_accreditor() to authenticated;
+
+-- Explicit Data API grants; RLS policies below provide the tenant/role boundary.
+revoke all on table public.organizations from anon, authenticated;
+grant select, update on table public.organizations to authenticated;
+revoke all on table public.auditorium_templates from anon, authenticated;
+grant select, insert, update, delete on table public.auditorium_templates to authenticated;
 
 -- New self-registrations create a new isolated organization and its first administrator.
 -- Admin-created staff accounts have no organization metadata and are provisioned by the admin Edge Function.
