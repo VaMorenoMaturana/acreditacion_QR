@@ -263,6 +263,65 @@ as $$
   );
 $$;
 
+-- Tenant ownership is immutable after provisioning.
+-- A newly created profile may transition once from NULL to its organization,
+-- but only through the trusted service-role provisioning path.
+create or replace function public.prevent_organization_change()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  if new.organization_id is distinct from old.organization_id then
+    if tg_table_name = 'profiles'
+       and old.organization_id is null
+       and new.organization_id is not null
+       and auth.role() = 'service_role' then
+      return new;
+    end if;
+    raise exception 'La organización propietaria de un registro no se puede modificar';
+  end if;
+  return new;
+end;
+$;
+
+revoke all on function public.prevent_organization_change() from public, anon, authenticated;
+
+drop trigger if exists profiles_organization_immutable on public.profiles;
+create trigger profiles_organization_immutable
+before update of organization_id on public.profiles
+for each row execute procedure public.prevent_organization_change();
+
+drop trigger if exists activities_organization_immutable on public.activities;
+create trigger activities_organization_immutable
+before update of organization_id on public.activities
+for each row execute procedure public.prevent_organization_change();
+
+drop trigger if exists attendees_organization_immutable on public.attendees;
+create trigger attendees_organization_immutable
+before update of organization_id on public.attendees
+for each row execute procedure public.prevent_organization_change();
+
+drop trigger if exists registrations_organization_immutable on public.registrations;
+create trigger registrations_organization_immutable
+before update of organization_id on public.registrations
+for each row execute procedure public.prevent_organization_change();
+
+drop trigger if exists check_ins_organization_immutable on public.check_ins;
+create trigger check_ins_organization_immutable
+before update of organization_id on public.check_ins
+for each row execute procedure public.prevent_organization_change();
+
+drop trigger if exists audit_logs_organization_immutable on public.audit_logs;
+create trigger audit_logs_organization_immutable
+before update of organization_id on public.audit_logs
+for each row execute procedure public.prevent_organization_change();
+
+drop trigger if exists auditorium_templates_organization_immutable on public.auditorium_templates;
+create trigger auditorium_templates_organization_immutable
+before update of organization_id on public.auditorium_templates
+for each row execute procedure public.prevent_organization_change();
+
 revoke all on function public.is_staff() from public, anon;
 revoke all on function public.is_admin() from public, anon;
 revoke all on function public.is_accreditor() from public, anon;
