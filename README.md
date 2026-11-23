@@ -33,9 +33,9 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 
 ## Administración de usuarios
 
-La pestaña **Administración** permite crear cuentas directamente. El administrador ingresa el correo (que funciona como nombre de usuario), define la contraseña y selecciona el rol (`staff` o `admin`). La cuenta queda habilitada para iniciar sesión inmediatamente; no se envía invitación ni correo de confirmación.
+La pestaña **Administración** permite crear cuentas dentro de la organización activa. El administrador ingresa el correo, define la contraseña y selecciona `staff`, `volunteer` o `admin`. La cuenta queda asociada a la misma organización; no se envía invitación ni correo de confirmación.
 
-La creación se ejecuta mediante la función Edge `admin-invite-user` (nombre técnico conservado para mantener la ruta de función ya configurada). La función valida el JWT del solicitante y comprueba que tenga rol `admin` en `public.profiles`. La clave `service_role` se utiliza exclusivamente dentro del entorno seguro de Supabase y nunca debe agregarse a `src/config.js`, al frontend ni a Render.
+La creación se ejecuta mediante la función Edge `admin-invite-user`. La función valida el JWT del solicitante y comprueba que tenga rol `admin` y organización asignada. La cuenta nueva recibe el mismo `organization_id`; nunca se permite que el administrador del frontend indique otra organización. La clave `service_role` se utiliza exclusivamente en el entorno seguro de Supabase.
 
 ### Despliegue de la función
 
@@ -56,7 +56,29 @@ Después de actualizar el repositorio, despliegue la función en el proyecto Sup
 
 La función utiliza las variables de entorno administradas por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`). No copie la clave privilegiada a archivos del repositorio ni a variables públicas del sitio.
 
-No es necesario ejecutar una migración SQL adicional: el trigger `handle_new_user` existente crea el perfil y la función Edge asigna el rol solicitado. La contraseña solo se recibe durante la creación, no se escribe en los registros de auditoría ni se devuelve al frontend. El administrador debe entregarla al usuario por un canal seguro y verificar cuidadosamente el correo, ya que la cuenta se crea con ese correo confirmado para permitir acceso inmediato.
+El trigger `handle_new_user` crea el perfil base y la función Edge asigna el rol y la organización del administrador que crea la cuenta. La contraseña solo se recibe durante la creación, no se escribe en los registros de auditoría ni se devuelve al frontend. El administrador debe entregarla por un canal seguro.
+## Organizaciones y aislamiento multiempresa
+
+La plataforma opera con una arquitectura multiempresa. Cada organización es un espacio de trabajo privado que agrupa sus actividades, inscritos, acreditaciones, usuarios y plantillas de auditorios. El campo visible **Dominio / organización** representa este espacio de trabajo; no es un dominio DNS ni crea un subdominio web.
+
+### Registro público
+
+En la pantalla de acceso, **Crear cuenta y organización** solicita nombre, correo, contraseña y nombre de la organización. Supabase Auth registra la cuenta y el trigger `handle_new_user` crea la organización y asigna a ese primer usuario el rol `admin`. Si está habilitada la confirmación de correo en Supabase Auth, la persona debe confirmar su dirección antes de iniciar sesión. El identificador técnico `slug` se genera internamente y es único.
+
+### Aislamiento de datos
+
+Las tablas de actividades, asistentes, inscripciones, acreditaciones, auditorios y auditoría tienen `organization_id`. Las políticas RLS comparan ese identificador con la organización del perfil autenticado. Las relaciones compuestas impiden enlazar una inscripción, actividad, asistente o plantilla de otra organización. Las cuentas creadas por el administrador quedan dentro de la misma organización.
+
+Para conservar los datos existentes, la migración asigna los registros actuales a una organización inicial **Fundación Espacio Mejor**. No se elimina ni se recrea ninguna actividad o inscripción.
+
+### Aplicación de la migración multiempresa
+
+En una base existente, después de respaldarla, ejecute una sola vez el contenido de:
+
+`supabase/migrations/20261123000000_multi_tenant_and_auditoriums.sql`
+
+En un proyecto nuevo, ejecute primero `supabase/schema.sql` y después esta migración. No vuelva a ejecutar el esquema completo sobre una base con datos.
+
 ## Rol Voluntarios y acreditación manual
 
 El rol `volunteer` solo muestra el módulo **Acreditación QR**. Puede seleccionar una actividad, consultar las personas inscritas y sus fila/asiento, acreditar manualmente con el botón **Acreditar** o utilizar el lector de cámara QR. No puede administrar usuarios, crear actividades, modificar inscripciones, eliminar registros ni asignar asientos.
@@ -68,6 +90,12 @@ Para una base de datos existente, ejecute una sola vez en **Supabase → SQL Edi
 - Conserva las operaciones de gestión (crear, editar, cancelar, eliminar y asignar asientos) limitadas a `staff` y `admin`.
 
 El formulario de creación de usuarios permite seleccionar Personal, Voluntarios o Administrador. La Edge Function `admin-invite-user` debe desplegarse con el código actualizado para aceptar el rol `volunteer`. No es necesario modificar manualmente las filas existentes: el administrador puede cambiar el rol desde la tabla de usuarios.
+
+## Auditorios personalizados y reutilizables
+
+La tabla `auditorium_templates` guarda plantillas de auditorios por organización. Cada plantilla define nombre, escenario, filas y bloques de asientos. Cada fila puede contener uno o varios bloques; los bloques se separan visualmente con pasillos. Se pueden crear, reutilizar y asignar a distintas actividades de la misma organización.
+
+La migración conserva la distribución original de 255 asientos como **Auditorio UAI · Viña del Mar** y la asigna a las actividades existentes. La dirección de numeración se guarda por actividad. Si una actividad ya tiene personas ubicadas, el sistema impide cambiar su plantilla hasta liberar las asignaciones para evitar alterar la ubicación física existente.
 
 ## Plantilla del ticket
 - `ticket-template-original.html` es el archivo original adjunto, preservado sin modificaciones.
