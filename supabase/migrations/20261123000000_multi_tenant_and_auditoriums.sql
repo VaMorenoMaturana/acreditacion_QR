@@ -98,7 +98,7 @@ alter table public.audit_logs alter column organization_id set not null;
 alter table public.activities
   add column if not exists auditorium_template_id uuid;
 alter table public.activities
-  add column if not exists seat_numbering_direction text not null default 'left_to_right'
+  add column if not exists seat_numbering_direction text default 'left_to_right'
   check (seat_numbering_direction in ('left_to_right', 'right_to_left'));
 
 create table if not exists public.auditorium_templates (
@@ -212,8 +212,7 @@ begin
   end if;
 
   update public.activities
-  set auditorium_template_id = v_template_id,
-      seat_numbering_direction = 'left_to_right'
+  set auditorium_template_id = v_template_id
   where organization_id = v_org_id
     and auditorium_template_id is null;
 end $$;
