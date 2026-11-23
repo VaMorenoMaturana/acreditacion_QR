@@ -17,6 +17,15 @@ let currentRole = null;
 let activeLayout = null;
 let editorRows = [];
 
+const legacyDirectionKey = "espacioAcredita.auditorio.directions";
+function readLegacyDirection(activityId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(legacyDirectionKey) || "{}");
+    return saved[activityId] === "right" ? "right_to_left" : "left_to_right";
+  } catch {
+    return "left_to_right";
+  }
+}
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
@@ -304,7 +313,21 @@ async function loadActivity(activityId) {
 
   rowDefs = activeLayout.rows;
   direction = activity.seat_numbering_direction ||
-    (activeLayout.numbering_direction === "right_to_left" ? "right_to_left" : "left_to_right");
+    (activeLayout.numbering_direction === "right_to_left"
+      ? "right_to_left"
+      : readLegacyDirection(activeActivityId));
+  if (!activity.seat_numbering_direction) {
+    const { error: directionError } = await supabase.from("activities")
+      .update({ seat_numbering_direction: direction })
+      .eq("id", activeActivityId)
+      .is("seat_numbering_direction", null);
+    if (directionError) {
+      setStatus("Se conservó la numeración anterior en este navegador, pero no se pudo guardar en la actividad: " + directionError.message, true);
+    } else {
+      activities = activities.map(item => item.id === activeActivityId
+        ? { ...item, seat_numbering_direction: direction } : item);
+    }
+  }
   buildSeats();
   updateNumberingUI();
   setStatus("Cargando inscritos desde Supabase…");
