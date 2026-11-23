@@ -329,26 +329,31 @@ function renderActivityOptions() {
 async function applySelectedTemplate() {
   const templateId = $("auditoriumSelect").value;
   const template = templates.find(item => item.id === templateId);
-  if (!activeActivityId) { setStatus("Seleccione primero una actividad.", true); return; }
-  if (!template) { setStatus("Seleccione un auditorio guardado.", true); return; }
-  if (templateId === activeTemplateId) { setStatus("Este auditorio ya está asignado a la actividad."); return; }
+  if (!activeActivityId) { setStatus("Seleccione primero una actividad.", true); return false; }
+  if (!template) { setStatus("Seleccione un auditorio guardado.", true); return false; }
+  if (templateId === activeTemplateId) { setStatus("Este auditorio ya está asignado a la actividad."); return true; }
   const hasSavedAssignments = await activityHasStoredSeatAssignments(activeActivityId);
-  if (hasSavedAssignments === null) return;
+  if (hasSavedAssignments === null) return false;
   if (hasSavedAssignments) {
     alert("Esta actividad ya tiene asientos asignados. Para proteger las ubicaciones existentes, primero libere todas las asignaciones antes de cambiar de auditorio.");
     $("auditoriumSelect").value = activeTemplateId || "";
-    return;
+    return false;
   }
   const layout = normalizeLayout(template.layout);
-  if (!layout) { setStatus("La plantilla seleccionada no contiene una distribución válida.", true); return; }
+  if (!layout) { setStatus("La plantilla seleccionada no contiene una distribución válida.", true); return false; }
   const { error } = await supabase.from("activities").update({
     auditorium_template_id: template.id,
     seat_numbering_direction: layout.numbering_direction
   }).eq("id", activeActivityId);
-  if (error) { setStatus("No se pudo asignar el auditorio: " + error.message, true); $("auditoriumSelect").value = activeTemplateId || ""; return; }
+  if (error) {
+    setStatus("No se pudo asignar el auditorio: " + error.message, true);
+    $("auditoriumSelect").value = activeTemplateId || "";
+    return false;
+  }
   activities = activities.map(item => item.id === activeActivityId
     ? { ...item, auditorium_template_id: template.id, seat_numbering_direction: layout.numbering_direction } : item);
   await loadActivity(activeActivityId);
+  return true;
 }
 
 function startNewTemplate() {
@@ -498,8 +503,9 @@ async function saveNewTemplate() {
   if (activeActivityId) {
     const hasSavedAssignments = await activityHasStoredSeatAssignments(activeActivityId);
     if (hasSavedAssignments === false) {
-      await applySelectedTemplate();
-      setStatus(`Auditorio «${data.name}» guardado y asignado a esta actividad.`);
+      const applied = await applySelectedTemplate();
+      if (applied) setStatus(`Auditorio «${data.name}» guardado y asignado a esta actividad.`);
+      else setStatus(`Auditorio «${data.name}» guardado para reutilizarlo, pero no se pudo aplicar a esta actividad. Revise el mensaje anterior.`, true);
     } else {
       $("auditoriumSelect").value = activeTemplateId || "";
       setStatus(`Auditorio «${data.name}» guardado para reutilizarlo. La actividad conserva su plantilla actual porque ya tiene asientos asignados o no fue posible verificarlos.`);
