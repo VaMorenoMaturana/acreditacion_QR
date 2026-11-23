@@ -64,3 +64,6 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .builder-summary{font-size:12px;font-weight:750;color:var(--accent);padding:8px 0}
 .template-editor button:disabled{opacity:.45}
 @media(max-width:900px){.template-editor{max-height:none}.layout-section{grid-template-columns:minmax(0,1fr) 70px auto}}
+
+.section-label{font-size:8px;font-weight:700;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-bottom:3px}
+.seat-section{display:flex;flex-direction:column;min-width:0}
