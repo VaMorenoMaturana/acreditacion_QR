@@ -28,6 +28,17 @@ const setStatus = (message, bad=false) => {
   $("activityStatus").style.color = bad ? "#a33333" : "";
 };
 const assignedCount = () => people.filter(person => person.seat_number !== null && person.seat_number !== "").length;
+async function activityHasStoredSeatAssignments(activityId) {
+  const { count, error } = await supabase.from("registrations")
+    .select("id", { count: "exact", head: true })
+    .eq("activity_id", activityId)
+    .not("seat_number", "is", null);
+  if (error) {
+    setStatus("No se pudieron verificar las asignaciones guardadas: " + error.message, true);
+    return null;
+  }
+  return (count || 0) > 0;
+}
 
 function normalizeLayout(layout) {
   if (!layout || !Array.isArray(layout.rows)) return null;
@@ -321,7 +332,9 @@ async function applySelectedTemplate() {
   if (!activeActivityId) { setStatus("Seleccione primero una actividad.", true); return; }
   if (!template) { setStatus("Seleccione un auditorio guardado.", true); return; }
   if (templateId === activeTemplateId) { setStatus("Este auditorio ya está asignado a la actividad."); return; }
-  if (assignedCount() > 0) {
+  const hasSavedAssignments = await activityHasStoredSeatAssignments(activeActivityId);
+  if (hasSavedAssignments === null) return;
+  if (hasSavedAssignments) {
     alert("Esta actividad ya tiene asientos asignados. Para proteger las ubicaciones existentes, primero libere todas las asignaciones antes de cambiar de auditorio.");
     $("auditoriumSelect").value = activeTemplateId || "";
     return;
@@ -482,12 +495,17 @@ async function saveNewTemplate() {
   renderTemplateOptions();
   $("auditoriumSelect").value = data.id;
   $("templateEditor").classList.add("hidden");
-  if (activeActivityId && assignedCount() === 0) {
-    await applySelectedTemplate();
-    setStatus(`Auditorio «${data.name}» guardado y asignado a esta actividad.`);
+  if (activeActivityId) {
+    const hasSavedAssignments = await activityHasStoredSeatAssignments(activeActivityId);
+    if (hasSavedAssignments === false) {
+      await applySelectedTemplate();
+      setStatus(`Auditorio «${data.name}» guardado y asignado a esta actividad.`);
+    } else {
+      $("auditoriumSelect").value = activeTemplateId || "";
+      setStatus(`Auditorio «${data.name}» guardado para reutilizarlo. La actividad conserva su plantilla actual porque ya tiene asientos asignados o no fue posible verificarlos.`);
+    }
   } else {
-    $("auditoriumSelect").value = activeTemplateId || "";
-    setStatus(`Auditorio «${data.name}» guardado para reutilizarlo. Esta actividad conserva su plantilla actual porque ya tiene asientos asignados.`);
+    setStatus(`Auditorio «${data.name}» guardado para reutilizarlo en otras actividades.`);
   }
 }
 
@@ -522,11 +540,12 @@ async function unassignSelected() {
 
 async function clearActivityAssignments() {
   if (!activeActivityId) return;
-  const assigned = assignedCount();
-  if (!assigned) { alert("Esta actividad no tiene asientos asignados."); return; }
-  if (!confirm(`¿Liberar los asientos de ${assigned} inscripción(es) de esta actividad? Los participantes se conservarán.`)) return;
+  const hasSavedAssignments = await activityHasStoredSeatAssignments(activeActivityId);
+  if (hasSavedAssignments === null) return;
+  if (!hasSavedAssignments) { alert("Esta actividad no tiene asientos asignados."); return; }
+  if (!confirm("¿Liberar todos los asientos guardados de esta actividad? Los participantes se conservarán.")) return;
   const { error } = await supabase.from("registrations").update({ seat_row: null, seat_number: null })
-    .eq("activity_id", activeActivityId).neq("status", "cancelled");
+    .eq("activity_id", activeActivityId);
   if (error) { alert("No se pudieron liberar los asientos: " + error.message); return; }
   await loadActivity(activeActivityId);
 }
@@ -559,7 +578,9 @@ function downloadCsv(isBackup=false) {
 
 async function changeNumbering() {
   if (!activeActivityId) return;
-  if (assignedCount() > 0) {
+  const hasSavedAssignments = await activityHasStoredSeatAssignments(activeActivityId);
+  if (hasSavedAssignments === null) return;
+  if (hasSavedAssignments) {
     alert("Para evitar cambiar el asiento físico de personas ya ubicadas, elija el sentido de numeración antes de asignar asientos. Para cambiarlo ahora, primero libere todas las asignaciones de esta actividad.");
     return;
   }
