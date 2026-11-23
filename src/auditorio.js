@@ -316,13 +316,14 @@ async function loadActivity(activityId) {
     (activeLayout.numbering_direction === "right_to_left"
       ? "right_to_left"
       : readLegacyDirection(activeActivityId));
+  let directionWarning = "";
   if (!activity.seat_numbering_direction) {
     const { error: directionError } = await supabase.from("activities")
       .update({ seat_numbering_direction: direction })
       .eq("id", activeActivityId)
       .is("seat_numbering_direction", null);
     if (directionError) {
-      setStatus("Se conservó la numeración anterior en este navegador, pero no se pudo guardar en la actividad: " + directionError.message, true);
+      directionWarning = "No se pudo guardar la numeración anterior en la actividad: " + directionError.message;
     } else {
       activities = activities.map(item => item.id === activeActivityId
         ? { ...item, seat_numbering_direction: direction } : item);
@@ -333,6 +334,7 @@ async function loadActivity(activityId) {
   setStatus("Cargando inscritos desde Supabase…");
   const ok = await loadActivityRegistrations(activeActivityId);
   if (!ok) { renderAll(); return; }
+  if (directionWarning) setStatus($("activityStatus").textContent + " · " + directionWarning, true);
   renderAll();
 }
 
