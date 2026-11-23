@@ -19,17 +19,14 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 - No contiene claves secretas. La configuración del navegador usa únicamente URL y clave pública de Supabase.
 
 ## Puesta en marcha
-1. Crea un proyecto Supabase para este sistema.
-2. En un proyecto Supabase nuevo, revisa y ejecuta `supabase/schema.sql`. Si ya tienes una base creada, respáldala y aplica las migraciones que correspondan. Para la función de voluntarios y acreditación manual, ejecuta en el SQL Editor el archivo `supabase/migrations/20261119000000_add_volunteer_role_manual_checkin.sql` (una sola vez). No vuelvas a ejecutar todo el esquema sobre una base existente.
-3. En Authentication, crea la primera cuenta de usuario.
-4. Asigna rol administrador ejecutando, en una consulta separada, por ejemplo:
-   ```sql
-   update public.profiles set role='admin' where email='correo-institucional@ejemplo.cl';
-   ```
-   Sustituye el correo de ejemplo por el correo real autorizado. No compartas credenciales.
-5. Copia URL del proyecto y la clave pública anon/publishable a `src/config.js`.
-6. Publica el contenido de esta carpeta como Static Site en Render. Build command vacío; Publish directory `.`.
-7. Accede con la cuenta creada. Crea una actividad de prueba y registra asistentes ficticios antes de usar datos reales.
+1. Cree un proyecto Supabase para este sistema.
+2. En un proyecto nuevo, revise y ejecute `supabase/schema.sql` y después `supabase/migrations/20261123000000_multi_tenant_and_auditoriums.sql`. En una instalación existente, realice un respaldo y ejecute únicamente la nueva migración multiempresa/auditorios; no vuelva a ejecutar el esquema completo sobre una base con datos.
+3. En **Authentication → URL Configuration**, configure la URL de Render como Site URL y agregue las URL de retorno que utilizará la aplicación. Habilite la confirmación de correo electrónico para el registro público.
+4. Copie la URL del proyecto y la clave pública anon/publishable a `src/config.js`.
+5. Despliegue la función Edge `admin-invite-user` con el archivo actualizado. La función debe conservar la validación de sesión y administrador en su código; nunca publique la clave `service_role`.
+6. Publique el contenido del repositorio como Static Site en Render. Build command vacío; Publish directory `.`.
+7. En la pantalla de acceso, seleccione **Crear cuenta y organización**. La primera cuenta de cada organización recibe el rol `admin`; confirme el correo si Supabase lo solicita.
+8. Cree una actividad de prueba y registre asistentes ficticios antes de usar datos reales.
 
 ## Administración de usuarios
 
