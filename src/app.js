@@ -459,8 +459,10 @@ $("logoutBtn").addEventListener("click",async()=>{await stopScanner();await supa
 async function afterLogin(){
  const {data,error}=await supabase.from("profiles").select("*, organizations(id,name,slug)").eq("id",currentUser.id).maybeSingle();
  if(error||!data||!data.organization_id||!data.organizations){
-  say("loginMessage","La cuenta no está asociada a una organización. Solicite al administrador que revise su configuración.",true);
-  await supabase.auth.signOut();currentUser=null;currentProfile=null;return;
+  const message="La cuenta no está asociada a una organización. Solicite al administrador que revise su configuración.";
+  if(!$("signupView").classList.contains("hidden"))say("signupMessage",message,true);
+  else say("loginMessage",message,true);
+  await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);return;
  }
  currentProfile=data;setSignedIn(true);await loadAll();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
 }
