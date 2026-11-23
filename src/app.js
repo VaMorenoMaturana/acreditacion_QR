@@ -15,8 +15,12 @@ const val = id => $(id).value.trim();
 const dateLabel = v => v ? new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(v+"T12:00:00Z")) : "—";
 const fileAsDataUrl = file => new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
 function setSignedIn(on){
- $("loginView").classList.toggle("hidden",on);$("appView").classList.toggle("hidden",!on);$("logoutBtn").classList.toggle("hidden",!on);
- $("userLabel").textContent=on?(currentUser?.email||""):"";
+ $("loginView").classList.toggle("hidden",on);
+ $("signupView").classList.add("hidden");
+ $("appView").classList.toggle("hidden",!on);
+ $("logoutBtn").classList.toggle("hidden",!on);
+ const organization=currentProfile?.organizations?.name||"";
+ $("userLabel").textContent=on?[(currentUser?.email||""),organization].filter(Boolean).join(" · "):"";
  applyRoleNavigation();
 }
 function applyRoleNavigation(){
@@ -410,10 +414,54 @@ function switchTab(name){
  if(name==="tickets")resizeTicketPreview();
 }
 $("loginForm").addEventListener("submit",async ev=>{ev.preventDefault();say("loginMessage","Iniciando sesión…");if(!supabase){say("loginMessage","Configura Supabase en src/config.js.",true);return;}const {data,error}=await supabase.auth.signInWithPassword({email:val("loginEmail"),password:$("loginPassword").value});if(error){say("loginMessage",error.message,true);return;}currentUser=data.user;await afterLogin();});
+$("showSignupBtn").addEventListener("click",()=>{
+ $("loginView").classList.add("hidden");$("signupView").classList.remove("hidden");say("signupMessage","");
+});
+$("showLoginBtn").addEventListener("click",()=>{
+ $("signupView").classList.add("hidden");$("loginView").classList.remove("hidden");say("loginMessage","");
+});
+async function signUpOrganization(ev){
+ ev.preventDefault();
+ if(!supabase){say("signupMessage","No se pudo conectar con Supabase.",true);return;}
+ const fullName=val("signupFullName");
+ const email=val("signupEmail").toLowerCase();
+ const password=$("signupPassword").value;
+ const passwordConfirm=$("signupPasswordConfirm").value;
+ const organizationName=val("signupOrganization");
+ if(fullName.length<2||fullName.length>180){say("signupMessage","Ingrese su nombre completo.",true);return;}
+ if(organizationName.length<2||organizationName.length>180){say("signupMessage","El nombre de la organización debe tener entre 2 y 180 caracteres.",true);return;}
+ if(password.length<8){say("signupMessage","La contraseña debe tener al menos 8 caracteres.",true);return;}
+ if(password!==passwordConfirm){say("signupMessage","Las contraseñas no coinciden.",true);return;}
+ const button=$("signupForm").querySelector('button[type="submit"]');
+ button.disabled=true;button.textContent="Creando organización…";
+ say("signupMessage","Creando su cuenta y espacio de trabajo…");
+ try{
+  const {data,error}=await supabase.auth.signUp({
+   email,password,
+   options:{data:{full_name:fullName,organization_name:organizationName}}
+  });
+  if(error){say("signupMessage",error.message,true);return;}
+  if(data.session&&data.user){
+   currentUser=data.user;
+   await afterLogin();
+   return;
+  }
+  $("signupForm").reset();
+  say("signupMessage","Su cuenta y organización fueron creadas. Revise su correo para confirmar la dirección y luego inicie sesión.");
+ }catch(error){
+  say("signupMessage",error?.message||"No fue posible crear la cuenta.",true);
+ }finally{
+  button.disabled=false;button.textContent="Crear mi organización";
+ }
+}
+$("signupForm").addEventListener("submit",signUpOrganization);
 $("logoutBtn").addEventListener("click",async()=>{await stopScanner();await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);});
 async function afterLogin(){
- const {data,error}=await supabase.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();
- if(error||!data){say("loginMessage","La cuenta no tiene perfil autorizado. Solicita al administrador que la habilite.",true);await supabase.auth.signOut();return;}
+ const {data,error}=await supabase.from("profiles").select("*, organizations(id,name,slug)").eq("id",currentUser.id).maybeSingle();
+ if(error||!data||!data.organization_id||!data.organizations){
+  say("loginMessage","La cuenta no está asociada a una organización. Solicite al administrador que revise su configuración.",true);
+  await supabase.auth.signOut();currentUser=null;currentProfile=null;return;
+ }
  currentProfile=data;setSignedIn(true);await loadAll();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
 }
 $("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("createUserForm").addEventListener("submit",createManagedUser);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
