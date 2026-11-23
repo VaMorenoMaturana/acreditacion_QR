@@ -45,3 +45,22 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .help{font-size:12px;color:var(--muted);margin:0 0 12px}
 @media(max-width:900px){.app{grid-template-columns:1fr;height:auto}.sidebar{border-right:0;border-bottom:1px solid var(--line);max-height:none}.main{overflow:visible}.person-list{max-height:220px}.auditorium{overflow-x:auto}.app{min-height:0}}
 @media(max-width:600px){header{height:auto;align-items:flex-start;flex-direction:column;padding:12px 16px}.header-actions{flex-wrap:wrap}.app{height:auto}.main{padding:14px}.sidebar{padding:14px}}
+
+/* Organización y constructor de auditorios personalizados */
+.divider{height:1px;background:var(--line);margin:16px 0}
+.template-editor{margin:16px 0;padding:14px;background:#f7f8fb;border:1px solid var(--line);border-radius:10px}
+.template-editor h3{margin:0 0 10px}
+.builder-input{width:100%;padding:8px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+.template-editor .field-label{margin:10px 0 5px}
+.template-editor .sub{line-height:1.5}
+.layout-row-editor{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px;margin:9px 0}
+.layout-row-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+.layout-row-head label,.layout-section label{display:block;font-size:11px;font-weight:700;color:var(--muted)}
+.layout-row-head input,.layout-section input{display:block;width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;margin-top:4px}
+.layout-sections{display:grid;gap:7px;margin-top:9px}
+.layout-section{display:grid;grid-template-columns:minmax(0,1fr) 70px auto;gap:6px;align-items:end;padding:7px;background:#f7f8fb;border-radius:7px}
+.layout-section button,.layout-row-head button,.row-add-section{padding:7px 9px;font-size:11px}
+.row-builder-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.builder-summary{font-size:12px;font-weight:750;color:var(--accent);padding:8px 0}
+.template-editor button:disabled{opacity:.45}
+@media(max-width:900px){.template-editor{max-height:none}.layout-section{grid-template-columns:minmax(0,1fr) 70px auto}}
