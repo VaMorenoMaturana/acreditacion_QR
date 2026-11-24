@@ -1,5 +1,6 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { ticketMarkup } from "./ticket-template.js";
+import { initSuperadmin } from "./superadmin.js";
 
 const $ = id => document.getElementById(id);
 const validConfig = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("TU-PROYECTO") &&
@@ -17,16 +18,20 @@ const fileAsDataUrl = file => new Promise((resolve,reject)=>{const r=new FileRea
 function setSignedIn(on){
  $("loginView").classList.toggle("hidden",on);
  $("signupView").classList.add("hidden");
+ $("passwordChangeView").classList.add("hidden");
  $("appView").classList.toggle("hidden",!on);
  $("logoutBtn").classList.toggle("hidden",!on);
  const organization=currentProfile?.organizations?.name||"";
- $("userLabel").textContent=on?[(currentUser?.email||""),organization].filter(Boolean).join(" · "):"";
+ const identity=currentProfile?.role==="superadmin"?"Superadministrador de plataforma":organization;
+ $("userLabel").textContent=on?[(currentUser?.email||""),identity].filter(Boolean).join(" · "):"";
  applyRoleNavigation();
 }
 function applyRoleNavigation(){
  const volunteer=currentProfile?.role==="volunteer";
+ const superadmin=currentProfile?.role==="superadmin";
  document.querySelectorAll(".tabs [data-tab],.tabs [data-goto]").forEach(button=>{
-  button.classList.toggle("hidden",volunteer&&button.dataset.tab!=="checkin");
+  if(superadmin) button.classList.toggle("hidden",button.id!=="superadminTab");
+  else button.classList.toggle("hidden",button.id==="superadminTab"||(volunteer&&button.dataset.tab!=="checkin"));
  });
 }
 function table(headers, rows){if(!rows.length)return '<p class="muted">Sin registros para mostrar.</p>';return `<table><thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;}
@@ -407,7 +412,8 @@ async function createManagedUser(ev){
 }
 async function saveRole(id){const role=document.querySelector(`[data-role-user="${id}"]`).value;const {error}=await supabase.from("profiles").update({role}).eq("id",id);if(error)alert(error.message);else await loadAll();}
 function switchTab(name){
- if(currentProfile?.role==="volunteer")name="checkin";
+ if(currentProfile?.role==="superadmin")name="superadmin";
+ else if(currentProfile?.role==="volunteer")name="checkin";
  document.querySelectorAll(".tab-panel").forEach(x=>x.classList.add("hidden"));
  $("tab-"+name)?.classList.remove("hidden");
  document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));
@@ -454,17 +460,41 @@ async function signUpOrganization(ev){
   button.disabled=false;button.textContent="Crear mi organización";
  }
 }
+
+$("passwordChangeForm").addEventListener("submit",async ev=>{
+ ev.preventDefault();
+ const password=$("forcedNewPassword").value,confirmPassword=$("forcedNewPasswordConfirm").value;
+ if(password.length<14){say("passwordChangeMessage","La nueva contraseña debe tener al menos 14 caracteres.",true);return;}
+ if(password!==confirmPassword){say("passwordChangeMessage","Las contraseñas no coinciden.",true);return;}
+ const button=$("passwordChangeForm").querySelector('button[type="submit"]');
+ button.disabled=true;button.textContent="Actualizando…";
+ try{
+  const {data,error}=await supabase.auth.updateUser({password,data:{...(currentUser?.user_metadata||{}),must_change_password:false}});
+  if(error)throw error;
+  currentUser=data.user;say("passwordChangeMessage","Contraseña actualizada correctamente.");
+  await afterLogin();
+ }catch(error){say("passwordChangeMessage",error?.message||"No se pudo actualizar la contraseña.",true);}
+ finally{button.disabled=false;button.textContent="Actualizar contraseña y continuar";}
+});
 $("signupForm").addEventListener("submit",signUpOrganization);
 $("logoutBtn").addEventListener("click",async()=>{await stopScanner();await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);});
 async function afterLogin(){
+ if(currentUser?.user_metadata?.must_change_password===true){
+  $("loginView").classList.add("hidden");$("signupView").classList.add("hidden");$("appView").classList.add("hidden");
+  $("passwordChangeView").classList.remove("hidden");$("logoutBtn").classList.remove("hidden");
+  $("userLabel").textContent=currentUser.email||"";return;
+ }
  const {data,error}=await supabase.from("profiles").select("*, organizations(id,name,slug)").eq("id",currentUser.id).maybeSingle();
- if(error||!data||!data.organization_id||!data.organizations){
-  const message="La cuenta no está asociada a una organización. Solicite al administrador que revise su configuración.";
+ const isSuperadmin=data?.role==="superadmin"&&(currentUser?.email||"").toLowerCase()==="vamoreno.maturana@gmail.com";
+ if(error||!data||(!data.organization_id&&!isSuperadmin)||(!isSuperadmin&&!data.organizations)){
+  const message="La cuenta no está asociada a una organización ni tiene permisos globales. Solicite al administrador que revise su configuración.";
   if(!$("signupView").classList.contains("hidden"))say("signupMessage",message,true);
   else say("loginMessage",message,true);
   await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);return;
  }
- currentProfile=data;setSignedIn(true);await loadAll();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
+ currentProfile=data;setSignedIn(true);
+ if(isSuperadmin){await initSuperadmin(supabase,currentUser);switchTab("superadmin");return;}
+ await loadAll();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
 }
 $("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("createUserForm").addEventListener("submit",createManagedUser);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
 $("registrationFilter").addEventListener("change",()=>{selectedRegistrationIds.clear();renderRegistrations();say("bulkDeleteMessage","Selección reiniciada al cambiar el filtro.");});
