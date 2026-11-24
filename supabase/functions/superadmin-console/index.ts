@@ -49,8 +49,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const expectedEmail = (Deno.env.get("SUPERADMIN_EMAIL") || "").trim().toLowerCase();
-    if (!supabaseUrl || !anonKey || !serviceRoleKey || !expectedEmail) {
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
       console.error("Falta configurar una variable de entorno requerida.");
       return fail(500, "La función no está configurada. Revise los secretos de Supabase.");
     }
@@ -64,8 +63,8 @@ Deno.serve(async (req: Request) => {
     });
     const { data: callerData, error: callerError } = await callerClient.auth.getUser();
     const caller = callerData.user;
-    if (callerError || !caller || (caller.email || "").toLowerCase() !== expectedEmail) {
-      return fail(403, "Esta cuenta no está autorizada para administrar la plataforma.");
+    if (callerError || !caller) {
+      return fail(401, "La sesión no es válida o ha expirado.");
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -75,9 +74,8 @@ Deno.serve(async (req: Request) => {
       .from("profiles").select("id,email,role,organization_id")
       .eq("id", caller.id).maybeSingle();
     if (callerProfileError || callerProfile?.role !== "superadmin" ||
-        (callerProfile.email || "").toLowerCase() !== expectedEmail ||
         callerProfile.organization_id !== null) {
-      return fail(403, "La cuenta no tiene el perfil global superadmin correctamente configurado.");
+      return fail(403, "Esta cuenta no tiene permisos de superadministrador global.");
     }
 
     let payload: Record<string, unknown>;
