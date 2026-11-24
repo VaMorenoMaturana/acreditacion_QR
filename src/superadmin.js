@@ -226,6 +226,10 @@ async function saveUser(ev) {
       location.reload();
       return;
     }
+    if (id && id === currentUser.id && role === "superadmin") {
+      const { data: refreshedSession } = await client.auth.refreshSession();
+      if (refreshedSession?.session?.user) currentUser = refreshedSession.session.user;
+    }
     clearUserForm(); await refreshAll();
     message("superUserMessage",result.message || "Usuario guardado.");
   } catch(error) { message("superUserMessage",error.message,true); }
