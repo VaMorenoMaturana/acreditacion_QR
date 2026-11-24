@@ -96,6 +96,19 @@ Deno.serve(async (req: Request) => {
       if (!data) throw new Error("La organización seleccionada no existe.");
       return data;
     };
+    const requireAnotherActiveSuperadmin = async (excludedUserId: string) => {
+      const { data: superadminProfiles, error: superadminProfilesError } = await admin
+        .from("profiles").select("id").eq("role", "superadmin");
+      if (superadminProfilesError) throw new Error(superadminProfilesError.message);
+      for (const profile of superadminProfiles || []) {
+        if (profile.id === excludedUserId) continue;
+        const { data: authData, error: authLookupError } = await admin.auth.admin.getUserById(profile.id);
+        if (authLookupError || !authData.user) continue;
+        const bannedUntil = authData.user.banned_until ? new Date(authData.user.banned_until).getTime() : 0;
+        if (!bannedUntil || bannedUntil <= Date.now()) return;
+      }
+      throw new Error("La operación dejaría la plataforma sin otro superadministrador activo. Cree o active otro superadministrador primero.");
+    };
     const dbError = (error: { message: string } | null) => {
       if (error) throw new Error(error.message);
     };
