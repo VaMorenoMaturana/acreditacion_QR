@@ -289,7 +289,7 @@ Deno.serve(async (req: Request) => {
         if (password.length < 14 || password.length > 128) return fail(400, "La contraseña temporal debe tener al menos 14 caracteres.");
         const { data: target, error: targetError } = await admin.from("profiles").select("email,role").eq("id", id).maybeSingle();
         dbError(targetError);
-        if (!target || target.role === "superadmin") return fail(404, "Usuario no encontrado o no administrable.");
+        if (!target) return fail(404, "Usuario no encontrado.");
         const { data: authResult, error: getError } = await admin.auth.admin.getUserById(id);
         if (getError || !authResult.user) return fail(404, "No se encontró la cuenta.");
         const { error } = await admin.auth.admin.updateUserById(id, {
@@ -306,7 +306,8 @@ Deno.serve(async (req: Request) => {
         if (!id || id === caller.id) return fail(400, "No puede suspender su propia cuenta.");
         const { data: target, error } = await admin.from("profiles").select("email,role,organization_id").eq("id", id).maybeSingle();
         dbError(error);
-        if (!target || target.role === "superadmin") return fail(404, "Usuario no encontrado o no administrable.");
+        if (!target) return fail(404, "Usuario no encontrado.");
+        if (suspended && target.role === "superadmin") await requireAnotherActiveSuperadmin(id);
         const { error: authError } = await admin.auth.admin.updateUserById(id, {
           ban_duration: suspended ? "876000h" : "none",
         });
@@ -319,7 +320,8 @@ Deno.serve(async (req: Request) => {
         if (!id || id === caller.id) return fail(400, "No puede eliminar su propia cuenta.");
         const { data: target, error: targetProfileError } = await admin.from("profiles").select("email,role,organization_id").eq("id", id).maybeSingle();
         dbError(targetProfileError);
-        if (!target || target.role === "superadmin") return fail(404, "Usuario no encontrado o no administrable.");
+        if (!target) return fail(404, "Usuario no encontrado.");
+        if (target.role === "superadmin") await requireAnotherActiveSuperadmin(id);
         if (target.role === "admin" && target.organization_id) {
           const { count, error: countError } = await admin.from("profiles").select("id", { count: "exact", head: true })
             .eq("organization_id", target.organization_id).eq("role", "admin");
