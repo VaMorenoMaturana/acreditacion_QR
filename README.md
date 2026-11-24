@@ -155,12 +155,13 @@ Compruebe además:
 
 La consola **Control global** está separada de los roles de organización. Permite consultar y administrar organizaciones, usuarios/perfiles, eventos, plantillas de auditorios, inscripciones y el registro de auditoría global. Incluye creación y edición de cuentas, cambio de rol y organización, suspensión/reactivación, restablecimiento de contraseña y eliminación.
 
-El rol `superadmin` está reservado a `vamoreno.maturana@gmail.com`. La consola no amplía las políticas RLS para los usuarios normales: cada operación global pasa por la Edge Function `superadmin-console`, que valida el JWT, el correo permitido y el rol del perfil antes de utilizar la clave privilegiada en el servidor. Nunca copie `service_role` al frontend.
+El primer rol `superadmin` se asigna inicialmente a `vamoreno.maturana@gmail.com`. Después pueden existir varios superadministradores globales. La consola no amplía las políticas RLS para los usuarios normales: cada operación global pasa por la Edge Function `superadmin-console`, que valida el JWT y comprueba que el perfil pertenezca al rol `superadmin` y no tenga organización asignada. Nunca copie `service_role` al frontend.
 
 ### Instalación
 
-1. En **Supabase → SQL Editor**, ejecute una sola vez:
-   `supabase/migrations/20261124000000_superadmin_console.sql`
+1. En **Supabase → SQL Editor**, ejecute una sola vez y en este orden las migraciones:
+   - `supabase/migrations/20261124000000_superadmin_console.sql`
+   - `supabase/migrations/20261125000000_manage_multiple_superadmins.sql`
 2. Si el perfil de ese correo ya existía, la migración lo convierte en `superadmin` y deja `organization_id = NULL`. Si aún no existe:
    - En **Authentication → Users**, invite `vamoreno.maturana@gmail.com`.
    - Cuando se cree el perfil, ejecute esta consulta desde SQL Editor:
@@ -180,11 +181,7 @@ El rol `superadmin` está reservado a `vamoreno.maturana@gmail.com`. La consola 
    ```
 
    Debe mostrar `role = superadmin` y `organization_id = NULL`.
-3. En **Supabase → Edge Functions → Secrets**, agregue:
-   - Key: `SUPERADMIN_EMAIL`
-   - Value: `vamoreno.maturana@gmail.com`
-
-   Las variables `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` son variables disponibles para las Edge Functions del proyecto. No las agregue al frontend. Supabase documenta la configuración de secretos en su [guía de Edge Function Secrets](https://supabase.com/docs/guides/functions/secrets).
+3. No se requiere el secreto `SUPERADMIN_EMAIL` a partir de esta versión. La autorización se basa en el perfil `superadmin` de cada usuario, validado desde el servidor. Las variables `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` son variables disponibles para las Edge Functions del proyecto. No agregue `service_role` al frontend. Supabase documenta la configuración de secretos en su [guía de Edge Function Secrets](https://supabase.com/docs/guides/functions/secrets).
 4. En **Edge Functions**, cree una función llamada `superadmin-console` con **Deploy a new function → Via Editor**. Reemplace el código de ejemplo por el archivo `supabase/functions/superadmin-console/index.ts` de este repositorio y despliegue. El editor del Dashboard permite crear y desplegar funciones sin usar Terminal; consulte la [guía oficial del editor](https://supabase.com/docs/guides/functions/quickstart-dashboard).
 5. Publique la versión actualizada del frontend en Render.
 
@@ -192,14 +189,14 @@ El rol `superadmin` está reservado a `vamoreno.maturana@gmail.com`. La consola 
 
 No utilice contraseñas débiles ni contraseñas publicadas en chats o repositorios. Para la cuenta superadministradora, use la invitación de Supabase y establezca una contraseña nueva, aleatoria y exclusiva desde el enlace recibido. Active MFA.
 
-Las cuentas creadas desde la consola reciben una contraseña temporal de al menos 14 caracteres y quedan obligadas a cambiarla en su primer ingreso. El restablecimiento de contraseña desde la consola aplica el mismo requisito. La contraseña no se guarda en los registros de auditoría.
+Las cuentas creadas desde la consola reciben una contraseña temporal de al menos 14 caracteres y quedan obligadas a cambiarla en su primer ingreso. Se pueden crear varios perfiles `superadmin`; estos quedan sin `organization_id`, por lo que no pertenecen a una organización particular. Desde la tabla global se pueden editar sus nombres y correos, cambiar roles y organizaciones, restablecer contraseñas, suspender, reactivar y eliminar otras cuentas superadministradoras. La contraseña no se guarda en los registros de auditoría. El sistema impide degradar, suspender o eliminar al último superadministrador activo. Para transferir el control a otra persona, cree primero su cuenta con rol `superadmin`, compruebe que puede ingresar y luego degrade o elimine la cuenta anterior.
 
 ### Acciones destructivas y límites
 
 - Eliminar una organización borra permanentemente sus usuarios, eventos, participantes, inscripciones, acreditaciones y plantillas de auditorios. Exige escribir exactamente el nombre de la organización.
 - Eliminar un evento borra sus inscripciones y acreditaciones. Los participantes se conservan si están inscritos en otro evento.
 - Una plantilla de auditorio no se puede eliminar mientras esté asignada a una actividad.
-- No se permite eliminar ni modificar la cuenta superadministradora desde la lista global de usuarios.
+- La plataforma exige conservar al menos un superadministrador activo. La cuenta que mantiene la sesión no puede suspenderse ni eliminarse a sí misma desde la consola.
 - Al eliminar un usuario, los registros históricos que lo referencian se conservan atribuyéndolos al operador global; se registra la acción en la auditoría de plataforma.
 - El restablecimiento de contraseña no invalida instantáneamente los JWT de acceso que ya estén emitidos; la contraseña nueva y el requisito de cambio aplican al siguiente inicio de sesión. La suspensión impide renovar sesiones, pero los JWT existentes pueden seguir válidos hasta su expiración.
 
