@@ -1,2 +1,5 @@
 [functions.admin-invite-user]
 verify_jwt = false
+
+[functions.superadmin-console]
+verify_jwt = false
