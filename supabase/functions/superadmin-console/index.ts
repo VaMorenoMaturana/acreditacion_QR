@@ -214,20 +214,21 @@ Deno.serve(async (req: Request) => {
         if (!validEmail(email)) return fail(400, "Ingrese un correo válido.");
         if (password.length < 14 || password.length > 128) return fail(400, "Use una contraseña temporal de al menos 14 caracteres.");
         if (fullName.length < 2) return fail(400, "Ingrese el nombre completo.");
-        if (!["staff","admin","volunteer"].includes(role)) return fail(400, "Rol no permitido.");
-        await requireOrganization(organizationId);
+        if (!["staff","admin","volunteer","superadmin"].includes(role)) return fail(400, "Rol no permitido.");
+        const assignedOrganizationId = role === "superadmin" ? null : organizationId;
+        if (role !== "superadmin") await requireOrganization(assignedOrganizationId);
         const { data: created, error: createError } = await admin.auth.admin.createUser({
           email, password, email_confirm: true, user_metadata: { full_name: fullName, must_change_password: true },
         });
         if (createError || !created.user) return fail(400, createError?.message || "No se pudo crear la cuenta.");
         const { error: saveError } = await admin.from("profiles").update({
-          email, full_name: fullName, role, organization_id: organizationId,
+          email, full_name: fullName, role, organization_id: assignedOrganizationId,
         }).eq("id", created.user.id);
         if (saveError) {
           await admin.auth.admin.deleteUser(created.user.id);
           return fail(500, "La cuenta fue revertida porque no se pudo guardar su perfil: " + saveError.message);
         }
-        await audit("user_created", "user", created.user.id, { email, role, organization_id: organizationId });
+        await audit("user_created", "user", created.user.id, { email, role, organization_id: assignedOrganizationId });
         return jsonResponse(200, { success: true, message: "Usuario creado. Se exigirá cambiar la contraseña temporal al iniciar sesión." });
       }
       case "update_user": {
