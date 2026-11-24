@@ -216,7 +216,7 @@ Deno.serve(async (req: Request) => {
         if (fullName.length < 2) return fail(400, "Ingrese el nombre completo.");
         if (!["staff","admin","volunteer","superadmin"].includes(role)) return fail(400, "Rol no permitido.");
         const assignedOrganizationId = role === "superadmin" ? null : organizationId;
-        if (role !== "superadmin") await requireOrganization(assignedOrganizationId);
+        if (role !== "superadmin") await requireOrganization(organizationId);
         const { data: created, error: createError } = await admin.auth.admin.createUser({
           email, password, email_confirm: true, user_metadata: { full_name: fullName, must_change_password: true },
         });
@@ -242,7 +242,8 @@ Deno.serve(async (req: Request) => {
         const email = textValue(payload.email, 254).toLowerCase();
         const fullName = textValue(payload.full_name, 180);
         const role = textValue(payload.role, 30);
-        const organizationId = role === "superadmin" ? null : textValue(payload.organization_id, 64);
+        const organizationId = textValue(payload.organization_id, 64);
+        const assignedOrganizationId = role === "superadmin" ? null : organizationId;
         if (!validEmail(email) || fullName.length < 2 ||
             !["staff","admin","volunteer","superadmin"].includes(role)) {
           return fail(400, "Revise correo, nombre y rol.");
@@ -261,7 +262,7 @@ Deno.serve(async (req: Request) => {
         if (authUpdateError) throw new Error(authUpdateError.message);
 
         const { error: profileUpdateError } = await admin.from("profiles").update({
-          email, full_name: fullName, role, organization_id: organizationId,
+          email, full_name: fullName, role, organization_id: assignedOrganizationId,
         }).eq("id", id);
         if (profileUpdateError) {
           if ((authResult.user.email || "").toLowerCase() !== email) {
@@ -276,7 +277,7 @@ Deno.serve(async (req: Request) => {
 
         await audit("user_updated", "user", id, {
           previous_email: current.email, email, previous_role: current.role, role,
-          previous_organization_id: current.organization_id, organization_id: organizationId,
+          previous_organization_id: current.organization_id, organization_id: assignedOrganizationId,
         });
         return jsonResponse(200, { success: true, message: role === "superadmin"
           ? "Perfil guardado como superadministrador global."
