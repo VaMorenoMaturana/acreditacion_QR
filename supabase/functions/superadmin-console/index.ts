@@ -233,20 +233,25 @@ Deno.serve(async (req: Request) => {
       }
       case "update_user": {
         const id = textValue(payload.id, 64);
-        if (!id || id === caller.id) return fail(400, "No puede modificar su propia cuenta desde esta consola.");
+        if (!id) return fail(400, "Seleccione un usuario.");
         const { data: current, error: currentError } = await admin.from("profiles")
           .select("id,email,role,organization_id").eq("id", id).maybeSingle();
         dbError(currentError);
         if (!current) return fail(404, "Usuario no encontrado.");
-        if (current.role === "superadmin") return fail(403, "La cuenta superadministradora se administra fuera de esta tabla.");
+
         const email = textValue(payload.email, 254).toLowerCase();
         const fullName = textValue(payload.full_name, 180);
         const role = textValue(payload.role, 30);
-        const organizationId = textValue(payload.organization_id, 64);
-        if (!validEmail(email) || fullName.length < 2 || !["staff","admin","volunteer"].includes(role)) {
+        const organizationId = role === "superadmin" ? null : textValue(payload.organization_id, 64);
+        if (!validEmail(email) || fullName.length < 2 ||
+            !["staff","admin","volunteer","superadmin"].includes(role)) {
           return fail(400, "Revise correo, nombre y rol.");
         }
-        await requireOrganization(organizationId);
+        if (role !== "superadmin") await requireOrganization(organizationId);
+        if (current.role === "superadmin" && role !== "superadmin") {
+          await requireAnotherActiveSuperadmin(id);
+        }
+
         const { data: authResult, error: getAuthError } = await admin.auth.admin.getUserById(id);
         if (getAuthError || !authResult.user) return fail(404, "No se encontró la cuenta de autenticación.");
         const { error: authUpdateError } = await admin.auth.admin.updateUserById(id, {
@@ -254,15 +259,28 @@ Deno.serve(async (req: Request) => {
           user_metadata: { ...authResult.user.user_metadata, full_name: fullName },
         });
         if (authUpdateError) throw new Error(authUpdateError.message);
-        const { error } = await admin.from("profiles").update({
+
+        const { error: profileUpdateError } = await admin.from("profiles").update({
           email, full_name: fullName, role, organization_id: organizationId,
         }).eq("id", id);
-        dbError(error);
+        if (profileUpdateError) {
+          if ((authResult.user.email || "").toLowerCase() !== email) {
+            const { error: rollbackError } = await admin.auth.admin.updateUserById(id, {
+              email: authResult.user.email || current.email,
+              email_confirm: true,
+            });
+            if (rollbackError) console.error("No se pudo revertir el correo de Auth tras un fallo al actualizar el perfil:", rollbackError.message);
+          }
+          throw new Error(profileUpdateError.message);
+        }
+
         await audit("user_updated", "user", id, {
           previous_email: current.email, email, previous_role: current.role, role,
           previous_organization_id: current.organization_id, organization_id: organizationId,
         });
-        return jsonResponse(200, { success: true, message: "Perfil y permisos actualizados." });
+        return jsonResponse(200, { success: true, message: role === "superadmin"
+          ? "Perfil guardado como superadministrador global."
+          : "Perfil, organización y permisos actualizados." });
       }
       case "reset_password": {
         const id = textValue(payload.id, 64);
