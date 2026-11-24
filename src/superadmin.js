@@ -74,7 +74,6 @@ function syncSuperUserOrganizationField() {
   $("superUserOrganization").required = !isRoot;
   $("superUserOrganization").disabled = isRoot;
   if (isRoot) $("superUserOrganization").value = "";
-  else if (!$("superUserOrganization").value && organizations.length) $("superUserOrganization").value = organizations[0].id;
 }
 function clearUserForm() {
   $("superUserForm").reset(); $("superUserId").value = "";
