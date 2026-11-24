@@ -19,23 +19,20 @@ Sistema interno para actividades, inscripciones, entradas PDF/ZIP y acreditació
 - No contiene claves secretas. La configuración del navegador usa únicamente URL y clave pública de Supabase.
 
 ## Puesta en marcha
-1. Crea un proyecto Supabase para este sistema.
-2. En un proyecto Supabase nuevo, revisa y ejecuta `supabase/schema.sql`. Si ya tienes una base creada, respáldala y aplica las migraciones que correspondan. Para la función de voluntarios y acreditación manual, ejecuta en el SQL Editor el archivo `supabase/migrations/20261119000000_add_volunteer_role_manual_checkin.sql` (una sola vez). No vuelvas a ejecutar todo el esquema sobre una base existente.
-3. En Authentication, crea la primera cuenta de usuario.
-4. Asigna rol administrador ejecutando, en una consulta separada, por ejemplo:
-   ```sql
-   update public.profiles set role='admin' where email='correo-institucional@ejemplo.cl';
-   ```
-   Sustituye el correo de ejemplo por el correo real autorizado. No compartas credenciales.
-5. Copia URL del proyecto y la clave pública anon/publishable a `src/config.js`.
-6. Publica el contenido de esta carpeta como Static Site en Render. Build command vacío; Publish directory `.`.
-7. Accede con la cuenta creada. Crea una actividad de prueba y registra asistentes ficticios antes de usar datos reales.
+1. Cree un proyecto Supabase para este sistema.
+2. En un proyecto nuevo, revise y ejecute `supabase/schema.sql` y después `supabase/migrations/20261123000000_multi_tenant_and_auditoriums.sql`. En una instalación existente, realice un respaldo y ejecute únicamente la nueva migración multiempresa/auditorios; no vuelva a ejecutar el esquema completo sobre una base con datos.
+3. En **Authentication → URL Configuration**, configure la URL de Render como Site URL y agregue las URL de retorno que utilizará la aplicación. Habilite la confirmación de correo electrónico para el registro público.
+4. Copie la URL del proyecto y la clave pública anon/publishable a `src/config.js`.
+5. Despliegue la función Edge `admin-invite-user` con el archivo actualizado. La función debe conservar la validación de sesión y administrador en su código; nunca publique la clave `service_role`.
+6. Publique el contenido del repositorio como Static Site en Render. Build command vacío; Publish directory `.`.
+7. En la pantalla de acceso, seleccione **Crear cuenta y organización**. La primera cuenta de cada organización recibe el rol `admin`; confirme el correo si Supabase lo solicita.
+8. Cree una actividad de prueba y registre asistentes ficticios antes de usar datos reales.
 
 ## Administración de usuarios
 
-La pestaña **Administración** permite crear cuentas directamente. El administrador ingresa el correo (que funciona como nombre de usuario), define la contraseña y selecciona el rol (`staff` o `admin`). La cuenta queda habilitada para iniciar sesión inmediatamente; no se envía invitación ni correo de confirmación.
+La pestaña **Administración** permite crear cuentas dentro de la organización activa. El administrador ingresa el correo, define la contraseña y selecciona `staff`, `volunteer` o `admin`. La cuenta queda asociada a la misma organización; no se envía invitación ni correo de confirmación.
 
-La creación se ejecuta mediante la función Edge `admin-invite-user` (nombre técnico conservado para mantener la ruta de función ya configurada). La función valida el JWT del solicitante y comprueba que tenga rol `admin` en `public.profiles`. La clave `service_role` se utiliza exclusivamente dentro del entorno seguro de Supabase y nunca debe agregarse a `src/config.js`, al frontend ni a Render.
+La creación se ejecuta mediante la función Edge `admin-invite-user`. La función valida el JWT del solicitante y comprueba que tenga rol `admin` y organización asignada. La cuenta nueva recibe el mismo `organization_id`; nunca se permite que el administrador del frontend indique otra organización. La clave `service_role` se utiliza exclusivamente en el entorno seguro de Supabase.
 
 ### Despliegue de la función
 
@@ -56,7 +53,29 @@ Después de actualizar el repositorio, despliegue la función en el proyecto Sup
 
 La función utiliza las variables de entorno administradas por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`). No copie la clave privilegiada a archivos del repositorio ni a variables públicas del sitio.
 
-No es necesario ejecutar una migración SQL adicional: el trigger `handle_new_user` existente crea el perfil y la función Edge asigna el rol solicitado. La contraseña solo se recibe durante la creación, no se escribe en los registros de auditoría ni se devuelve al frontend. El administrador debe entregarla al usuario por un canal seguro y verificar cuidadosamente el correo, ya que la cuenta se crea con ese correo confirmado para permitir acceso inmediato.
+El trigger `handle_new_user` crea el perfil base y la función Edge asigna el rol y la organización del administrador que crea la cuenta. La contraseña solo se recibe durante la creación, no se escribe en los registros de auditoría ni se devuelve al frontend. El administrador debe entregarla por un canal seguro.
+## Organizaciones y aislamiento multiempresa
+
+La plataforma opera con una arquitectura multiempresa. Cada organización es un espacio de trabajo privado que agrupa sus actividades, inscritos, acreditaciones, usuarios y plantillas de auditorios. El campo visible **Dominio / organización** representa este espacio de trabajo; no es un dominio DNS ni crea un subdominio web.
+
+### Registro público
+
+En la pantalla de acceso, **Crear cuenta y organización** solicita nombre, correo, contraseña y nombre de la organización. Supabase Auth registra la cuenta y el trigger `handle_new_user` crea la organización y asigna a ese primer usuario el rol `admin`. Si está habilitada la confirmación de correo en Supabase Auth, la persona debe confirmar su dirección antes de iniciar sesión. El identificador técnico `slug` se genera internamente y es único.
+
+### Aislamiento de datos
+
+Las tablas de actividades, asistentes, inscripciones, acreditaciones, auditorios y auditoría tienen `organization_id`. Las políticas RLS comparan ese identificador con la organización del perfil autenticado. Las relaciones compuestas impiden enlazar una inscripción, actividad, asistente o plantilla de otra organización. Las cuentas creadas por el administrador quedan dentro de la misma organización.
+
+Para conservar los datos existentes, la migración asigna los registros actuales a una organización inicial **Fundación Espacio Mejor**. No se elimina ni se recrea ninguna actividad o inscripción.
+
+### Aplicación de la migración multiempresa
+
+En una base existente, después de respaldarla, ejecute una sola vez el contenido de:
+
+`supabase/migrations/20261123000000_multi_tenant_and_auditoriums.sql`
+
+En un proyecto nuevo, ejecute primero `supabase/schema.sql` y después esta migración. No vuelva a ejecutar el esquema completo sobre una base con datos.
+
 ## Rol Voluntarios y acreditación manual
 
 El rol `volunteer` solo muestra el módulo **Acreditación QR**. Puede seleccionar una actividad, consultar las personas inscritas y sus fila/asiento, acreditar manualmente con el botón **Acreditar** o utilizar el lector de cámara QR. No puede administrar usuarios, crear actividades, modificar inscripciones, eliminar registros ni asignar asientos.
@@ -68,6 +87,12 @@ Para una base de datos existente, ejecute una sola vez en **Supabase → SQL Edi
 - Conserva las operaciones de gestión (crear, editar, cancelar, eliminar y asignar asientos) limitadas a `staff` y `admin`.
 
 El formulario de creación de usuarios permite seleccionar Personal, Voluntarios o Administrador. La Edge Function `admin-invite-user` debe desplegarse con el código actualizado para aceptar el rol `volunteer`. No es necesario modificar manualmente las filas existentes: el administrador puede cambiar el rol desde la tabla de usuarios.
+
+## Auditorios personalizados y reutilizables
+
+La tabla `auditorium_templates` guarda plantillas de auditorios por organización. Cada plantilla define nombre, escenario, filas y bloques de asientos. Cada fila puede contener uno o varios bloques; los bloques se separan visualmente con pasillos. Se pueden crear, reutilizar y asignar a distintas actividades de la misma organización.
+
+La migración conserva la distribución original de 255 asientos como **Auditorio UAI · Viña del Mar** y la asigna a las actividades existentes. La dirección de numeración se guarda por actividad. Si una actividad ya tiene personas ubicadas, el sistema impide cambiar su plantilla hasta liberar las asignaciones para evitar alterar la ubicación física existente.
 
 ## Plantilla del ticket
 - `ticket-template-original.html` es el archivo original adjunto, preservado sin modificaciones.
@@ -85,9 +110,9 @@ Luis Prueba,luis@example.cl,Organización Prueba,,
 El importador valida campos y duplicados dentro del archivo; la base de datos evita duplicar la misma inscripción para una misma persona. Para producción se recomienda acordar la regla de deduplicación de personas y probar CSV exportados de los sistemas reales.
 
 ## Límites conocidos de esta versión
-- No se envían correos automáticamente.
+- No se envían correos transaccionales a los inscritos; Supabase Auth puede enviar el correo de confirmación del registro público si está habilitado.
 - La acreditación requiere conexión activa a Supabase; no hay modo offline.
-- No incluye registro público, certificados, integraciones externas ni check-out.
+- No incluye certificados, integraciones externas ni check-out.
 - Los logotipos se almacenan como data URL en registros de actividad; para uso sostenido conviene migrarlos a Supabase Storage con límites de tamaño y permisos.
 - La importación CSV es secuencial y está pensada para lotes pequeños/medianos; probar el volumen real.
 - La auditoría está iniciada, pero no todos los cambios quedan auditados aún.
@@ -100,6 +125,16 @@ El importador valida campos y duplicados dentro del archivo; la base de datos ev
 - Definir aviso de privacidad, base de legitimación, retención y procedimiento de eliminación antes de cargar datos personales reales.
 - La política inicial de perfiles permite que cada usuario vea su propio perfil y que administradores vean todos; el alta automática crea rol `staff`.
 - Las funciones `SECURITY DEFINER` y políticas deben revisarse en un entorno de prueba antes de usar datos reales.
+
+## Verificación de aislamiento antes de producción
+
+En un proyecto de prueba, cree dos organizaciones con cuentas distintas. En cada una cree una actividad, una inscripción y una plantilla de auditorio. Inicie sesión alternadamente y compruebe que cada organización solo ve sus propios registros, usuarios y auditorios. También pruebe que una cuenta de una organización no pueda consultar por API el identificador de una actividad o plantilla de la otra.
+
+Compruebe además:
+- Que el administrador inicial de cada organización puede crear usuarios dentro de su propio espacio.
+- Que un voluntario solo puede entrar a Acreditación QR y no puede acceder al módulo de auditorios.
+- Que cambiar una plantilla o la dirección de numeración se bloquea cuando la actividad conserva asientos asignados.
+- Que una acreditación manual y una por QR dejan el mismo estado final y no permiten un segundo check-in.
 
 ## Despliegue Render
 - New > Static Site.

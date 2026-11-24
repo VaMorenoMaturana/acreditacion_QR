@@ -3,22 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestor de Asientos · Auditorio</title>
+<title>Asignación de asientos · Espacio Acredita</title>
 <link rel="stylesheet" href="./auditorio.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <header>
-  <strong>GESTOR DE ASIENTOS · AUDITORIO</strong>
-  <div class="header-actions"><span id="userLabel">Espacio Acredita</span><button id="backBtn">← Volver a acreditación</button><button id="logoutBtn">Cerrar sesión</button></div>
+  <strong>ASIGNACIÓN DE ASIENTOS</strong>
+  <div class="header-actions"><span id="userLabel">Espacio Acredita</span><button id="backBtn">← Volver</button><button id="logoutBtn">Cerrar sesión</button></div>
 </header>
 <div class="app">
 <aside class="sidebar">
-  <h2>Participantes</h2>
-  <p class="sub">Inscritos en la actividad seleccionada, cargados directamente desde Espacio Acredita.</p>
+  <h2>Configuración</h2>
   <label class="field-label" for="activitySelect">Actividad</label>
   <select id="activitySelect" class="activity-select"><option value="">Cargando actividades…</option></select>
+  <label class="field-label" for="auditoriumSelect">Auditorio asignado</label>
+  <select id="auditoriumSelect" class="activity-select"><option value="">Cargando auditorios…</option></select>
   <div class="sub" id="activityStatus" style="margin:8px 0">Conectando con Supabase…</div>
+  <div class="actions">
+    <button id="applyAuditoriumBtn" class="primary">Aplicar a esta actividad</button>
+    <button id="createAuditoriumBtn">Crear auditorio personalizado</button>
+    <button id="deleteAuditoriumBtn" class="danger">Eliminar plantilla</button>
+  </div>
+  <section id="templateEditor" class="template-editor hidden">
+    <h3>Nuevo auditorio</h3>
+    <label class="field-label">Nombre para reutilizar<input id="templateName" class="builder-input" maxlength="120" placeholder="Ej. Teatro Municipal"></label>
+    <label class="field-label">Descripción<input id="templateDescription" class="builder-input" maxlength="250" placeholder="Opcional"></label>
+    <label class="field-label">Texto del escenario<input id="stageLabel" class="builder-input" maxlength="40" value="ESCENARIO"></label>
+    <label class="field-label">Texto del pasillo<input id="aisleLabel" class="builder-input" maxlength="40" value="PASILLO"></label>
+    <p class="sub">Configure las filas y bloques. Cada bloque representa un grupo de asientos; entre bloques se dibuja un pasillo. Puede agregar tantas filas y bloques como necesite.</p>
+    <div id="layoutRows"></div>
+    <div class="actions"><button id="addLayoutRowBtn">+ Agregar fila</button></div>
+    <div class="builder-summary" id="layoutSummary">0 filas · 0 asientos</div>
+    <div class="actions">
+      <button id="saveTemplateBtn" class="primary">Guardar auditorio</button>
+      <button id="cancelTemplateBtn">Cancelar</button>
+    </div>
+    <p id="templateMessage" class="sub" role="status"></p>
+  </section>
+  <div class="divider"></div>
+  <h2>Participantes</h2>
+  <p class="sub">Inscritos en la actividad seleccionada.</p>
   <input class="search" id="search" placeholder="Buscar por nombre u organización…">
   <div class="sub" id="listCount">0 participantes</div>
   <div class="person-list" id="peopleList"><div class="empty">Cargando participantes…</div></div>
@@ -31,15 +56,15 @@
     <button id="backupBtn">Generar respaldo</button>
     <button id="clearBtn" class="danger">Limpiar asignaciones de esta actividad</button>
   </div>
-  <p class="sub">Los cambios se guardan inmediatamente en Supabase. Los datos personales y los códigos QR no se modifican.</p>
+  <p class="sub">Los cambios se guardan en la organización activa. El auditorio es una plantilla reutilizable; cada actividad conserva sus propias asignaciones.</p>
 </aside>
 <main class="main">
   <div class="toolbar">
-    <div><h2 style="margin-bottom:3px">Plano del auditorio</h2><div class="sub">Vista desde el público; escenario al frente.</div></div>
+    <div><h2 id="auditoriumHeading" style="margin-bottom:3px">Plano del auditorio</h2><div class="sub">Vista desde el público; escenario al frente.</div></div>
     <div class="stats">
-      <div class="stat"><b id="totalCount">255</b> asientos</div>
+      <div class="stat"><b id="totalCount">0</b> asientos</div>
       <div class="stat"><b id="assignedCount">0</b> asignados</div>
-      <div class="stat"><b id="freeCount">255</b> disponibles</div>
+      <div class="stat"><b id="freeCount">0</b> disponibles</div>
     </div>
   </div>
   <div class="toolbar">
@@ -50,11 +75,11 @@
     </div>
   </div>
   <section class="auditorium">
-    <div class="stage">ESCENARIO</div>
+    <div class="stage" id="stageDisplay">ESCENARIO</div>
     <div id="seatMap"></div>
   </section>
   <div class="status" id="seatInfo" style="margin-top:12px">Modo consulta: pase el cursor sobre un asiento para ver quién está asignado. Active el modo edición para realizar cambios.</div>
-  <p class="help" id="numberingHelp" style="margin-top:12px">La numeración se asigna fila por fila, desde la izquierda hacia la derecha, mirando desde el público al escenario. En las filas 7 a 12, el conteo continúa a través de ambos bloques y el pasillo central.</p>
+  <p class="help" id="numberingHelp" style="margin-top:12px">La numeración se asigna fila por fila, según el sentido seleccionado.</p>
 </main>
 </div>
 <script type="module" src="./src/auditorio.js"></script>
