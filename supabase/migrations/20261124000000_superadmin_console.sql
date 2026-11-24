@@ -81,6 +81,32 @@ alter table public.platform_audit_logs enable row level security;
 revoke all on table public.platform_audit_logs from public, anon, authenticated;
 grant all on table public.platform_audit_logs to service_role;
 
+-- Delete an organization's tenant data atomically. Auth accounts are removed
+-- by the Edge Function afterwards, because auth.users is managed by Supabase Auth.
+create or replace function public.superadmin_purge_organization(p_organization_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'No autorizado';
+  end if;
+
+  delete from public.check_ins where organization_id = p_organization_id;
+  delete from public.registrations where organization_id = p_organization_id;
+  delete from public.activities where organization_id = p_organization_id;
+  delete from public.auditorium_templates where organization_id = p_organization_id;
+  delete from public.attendees where organization_id = p_organization_id;
+  delete from public.audit_logs where organization_id = p_organization_id;
+  update public.profiles set organization_id = null where organization_id = p_organization_id;
+end;
+$function$;
+
+revoke all on function public.superadmin_purge_organization(uuid) from public, anon, authenticated;
+grant execute on function public.superadmin_purge_organization(uuid) to service_role;
+
 -- Upgrade an existing account with this exact email, if it already exists.
 -- If the account is created later, run the one-time bootstrap UPDATE shown in README.
 update public.profiles
