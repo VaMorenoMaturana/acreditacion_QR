@@ -274,8 +274,8 @@ Deno.serve(async (req: Request) => {
         const id = textValue(payload.id, 64);
         const suspended = payload.suspended === true;
         if (!id || id === caller.id) return fail(400, "No puede suspender su propia cuenta.");
-        const { data: target, error } = await admin.from("profiles").select("email,role,organization_id").eq("id", id).maybeSingle();
-        dbError(error);
+        const { data: target, error: targetProfileError } = await admin.from("profiles").select("email,role,organization_id").eq("id", id).maybeSingle();
+        dbError(targetProfileError);
         if (!target || target.role === "superadmin") return fail(404, "Usuario no encontrado o no administrable.");
         const { error: authError } = await admin.auth.admin.updateUserById(id, {
           ban_duration: suspended ? "876000h" : "none",
