@@ -273,8 +273,6 @@ Deno.serve(async (req: Request) => {
           user_metadata: { ...authResult.user.user_metadata, must_change_password: true },
         });
         dbError(error);
-        const { error: revokeError } = await admin.auth.admin.signOut(id, "global");
-        if (revokeError) console.warn("No se pudieron revocar todas las sesiones del usuario:", revokeError.message);
         await audit("user_password_reset", "user", id, { email: target.email });
         return jsonResponse(200, { success: true, message: "Contraseña temporal cambiada. El usuario deberá reemplazarla al iniciar sesión." });
       }
@@ -289,10 +287,6 @@ Deno.serve(async (req: Request) => {
           ban_duration: suspended ? "876000h" : "none",
         });
         dbError(authError);
-        if (suspended) {
-          const { error: revokeError } = await admin.auth.admin.signOut(id, "global");
-          if (revokeError) console.warn("No se pudieron revocar todas las sesiones del usuario:", revokeError.message);
-        }
         await audit(suspended ? "user_suspended" : "user_reactivated", "user", id, { email: target.email });
         return jsonResponse(200, { success: true, message: suspended ? "Cuenta suspendida." : "Cuenta reactivada." });
       }
