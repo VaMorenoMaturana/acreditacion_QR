@@ -68,32 +68,44 @@ function renderOrganizations() {
     ? `<table><thead><tr><th>Organización</th><th>Usuarios</th><th>Eventos</th><th>Auditorios</th><th>Creación</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="muted">No hay organizaciones registradas.</p>';
 }
+function syncSuperUserOrganizationField() {
+  const isRoot = $("superUserRole").value === "superadmin";
+  $("superUserOrganizationLabel").classList.toggle("hidden", isRoot);
+  $("superUserOrganization").required = !isRoot;
+  $("superUserOrganization").disabled = isRoot;
+  if (isRoot) $("superUserOrganization").value = "";
+}
 function clearUserForm() {
   $("superUserForm").reset(); $("superUserId").value = "";
   $("superUserPasswordLabel").classList.remove("hidden");
   $("superUserPassword").required = true;
   $("superUserSaveBtn").textContent = "Crear usuario";
   $("superUserRole").disabled = false;
+  syncSuperUserOrganizationField();
   message("superUserMessage","");
 }
 function renderUsers() {
   const rows = users.map(user => {
     const suspended = user.banned_until && new Date(user.banned_until).getTime() > Date.now();
     const isRoot = user.role === "superadmin";
+    const isSelf = user.id === currentUser?.id;
+    const actions = [
+      `<button class="secondary" data-super-user-edit="${esc(user.id)}">Editar</button>`,
+      !isSelf ? `<button class="secondary" data-super-user-reset="${esc(user.id)}">Clave</button>` : "",
+      !isSelf ? `<button class="secondary" data-super-user-status="${esc(user.id)}" data-suspended="${suspended ? "true":"false"}">${suspended ? "Reactivar":"Suspender"}</button>` : "",
+      !isSelf ? `<button class="secondary danger-btn" data-super-user-delete="${esc(user.id)}">Eliminar</button>` : "",
+    ].filter(Boolean).join(" ");
     return `<tr>
-      <td><strong>${esc(user.full_name || "Sin nombre")}</strong><div class="muted">${esc(user.email)}</div></td>
-      <td>${esc(user.organizations?.name || "Sin organización")}</td>
+      <td><strong>${esc(user.full_name || "Sin nombre")}</strong><div class="muted">${esc(user.email)}${isSelf ? " · Usted" : ""}</div></td>
+      <td>${isRoot ? '<span class="badge">Acceso global</span>' : esc(user.organizations?.name || "Sin organización")}</td>
       <td>${esc(roleLabel(user.role))}</td>
-      <td>${isRoot ? "Protegida" : suspended ? '<span class="badge bad">Suspendida</span>' : '<span class="badge good">Activa</span>'}</td>
+      <td>${suspended ? '<span class="badge bad">Suspendida</span>' : '<span class="badge good">Activa</span>'}</td>
       <td>${dateTime(user.last_sign_in_at)}</td>
-      <td>${isRoot ? "—" : `<button class="secondary" data-super-user-edit="${esc(user.id)}">Editar</button>
-        <button class="secondary" data-super-user-reset="${esc(user.id)}">Clave</button>
-        <button class="secondary" data-super-user-status="${esc(user.id)}" data-suspended="${suspended ? "true":"false"}">${suspended ? "Reactivar":"Suspender"}</button>
-        <button class="secondary danger-btn" data-super-user-delete="${esc(user.id)}">Eliminar</button>`}</td>
+      <td>${actions}</td>
     </tr>`;
   }).join("");
   $("superUsersTable").innerHTML = rows
-    ? `<table><thead><tr><th>Perfil</th><th>Organización</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>Perfil</th><th>Organización / acceso</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="muted">No hay perfiles registrados.</p>';
 }
 function clearActivityForm() {
@@ -199,13 +211,24 @@ async function saveOrganization(ev) {
 async function saveUser(ev) {
   ev.preventDefault();
   const id = $("superUserId").value;
+  const role = $("superUserRole").value;
   const values = {
     id, full_name:$("superUserName").value.trim(), email:$("superUserEmail").value.trim(),
-    organization_id:$("superUserOrganization").value, role:$("superUserRole").value,
+    organization_id:role === "superadmin" ? null : $("superUserOrganization").value, role,
   };
   if (!id) values.password = $("superUserPassword").value;
   try {
     const result = await api(id ? "update_user" : "create_user", values);
+    if (id && id === currentUser.id && role !== "superadmin") {
+      alert("Su cuenta dejó de ser superadministradora. La sesión se cerrará.");
+      await client.auth.signOut();
+      location.reload();
+      return;
+    }
+    if (id && id === currentUser.id && role === "superadmin") {
+      const { data: refreshedSession } = await client.auth.refreshSession();
+      if (refreshedSession?.session?.user) currentUser = refreshedSession.session.user;
+    }
     clearUserForm(); await refreshAll();
     message("superUserMessage",result.message || "Usuario guardado.");
   } catch(error) { message("superUserMessage",error.message,true); }
@@ -250,7 +273,8 @@ function editUser(id) {
   $("superUserEmail").value = user.email || ""; $("superUserOrganization").value = user.organization_id || "";
   $("superUserRole").value = user.role; $("superUserRole").disabled = false;
   $("superUserPasswordLabel").classList.add("hidden"); $("superUserPassword").required = false;
-  $("superUserSaveBtn").textContent = "Guardar cambios"; message("superUserMessage","");
+  $("superUserSaveBtn").textContent = "Guardar cambios";
+  syncSuperUserOrganizationField(); message("superUserMessage","");
   switchView("users");
 }
 function editActivity(id) {
@@ -358,6 +382,7 @@ export async function initSuperadmin(supabase, user) {
     $("superOrganizationForm").addEventListener("submit",saveOrganization);
     $("superOrganizationClearBtn").addEventListener("click",clearOrganizationForm);
     $("superUserForm").addEventListener("submit",saveUser);
+    $("superUserRole").addEventListener("change",syncSuperUserOrganizationField);
     $("superUserClearBtn").addEventListener("click",clearUserForm);
     $("superActivityForm").addEventListener("submit",saveActivity);
     $("superActivityClearBtn").addEventListener("click",clearActivityForm);

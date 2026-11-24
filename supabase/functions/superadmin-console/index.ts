@@ -49,8 +49,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const expectedEmail = (Deno.env.get("SUPERADMIN_EMAIL") || "").trim().toLowerCase();
-    if (!supabaseUrl || !anonKey || !serviceRoleKey || !expectedEmail) {
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
       console.error("Falta configurar una variable de entorno requerida.");
       return fail(500, "La función no está configurada. Revise los secretos de Supabase.");
     }
@@ -64,8 +63,8 @@ Deno.serve(async (req: Request) => {
     });
     const { data: callerData, error: callerError } = await callerClient.auth.getUser();
     const caller = callerData.user;
-    if (callerError || !caller || (caller.email || "").toLowerCase() !== expectedEmail) {
-      return fail(403, "Esta cuenta no está autorizada para administrar la plataforma.");
+    if (callerError || !caller) {
+      return fail(401, "La sesión no es válida o ha expirado.");
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -75,9 +74,8 @@ Deno.serve(async (req: Request) => {
       .from("profiles").select("id,email,role,organization_id")
       .eq("id", caller.id).maybeSingle();
     if (callerProfileError || callerProfile?.role !== "superadmin" ||
-        (callerProfile.email || "").toLowerCase() !== expectedEmail ||
         callerProfile.organization_id !== null) {
-      return fail(403, "La cuenta no tiene el perfil global superadmin correctamente configurado.");
+      return fail(403, "Esta cuenta no tiene permisos de superadministrador global.");
     }
 
     let payload: Record<string, unknown>;
@@ -97,6 +95,19 @@ Deno.serve(async (req: Request) => {
       if (error) throw new Error(error.message);
       if (!data) throw new Error("La organización seleccionada no existe.");
       return data;
+    };
+    const requireAnotherActiveSuperadmin = async (excludedUserId: string) => {
+      const { data: superadminProfiles, error: superadminProfilesError } = await admin
+        .from("profiles").select("id").eq("role", "superadmin");
+      if (superadminProfilesError) throw new Error(superadminProfilesError.message);
+      for (const profile of superadminProfiles || []) {
+        if (profile.id === excludedUserId) continue;
+        const { data: authData, error: authLookupError } = await admin.auth.admin.getUserById(profile.id);
+        if (authLookupError || !authData.user) continue;
+        const bannedUntil = authData.user.banned_until ? new Date(authData.user.banned_until).getTime() : 0;
+        if (!bannedUntil || bannedUntil <= Date.now()) return;
+      }
+      throw new Error("La operación dejaría la plataforma sin otro superadministrador activo. Cree o active otro superadministrador primero.");
     };
     const dbError = (error: { message: string } | null) => {
       if (error) throw new Error(error.message);
@@ -203,38 +214,45 @@ Deno.serve(async (req: Request) => {
         if (!validEmail(email)) return fail(400, "Ingrese un correo válido.");
         if (password.length < 14 || password.length > 128) return fail(400, "Use una contraseña temporal de al menos 14 caracteres.");
         if (fullName.length < 2) return fail(400, "Ingrese el nombre completo.");
-        if (!["staff","admin","volunteer"].includes(role)) return fail(400, "Rol no permitido.");
-        await requireOrganization(organizationId);
+        if (!["staff","admin","volunteer","superadmin"].includes(role)) return fail(400, "Rol no permitido.");
+        const assignedOrganizationId = role === "superadmin" ? null : organizationId;
+        if (role !== "superadmin") await requireOrganization(organizationId);
         const { data: created, error: createError } = await admin.auth.admin.createUser({
           email, password, email_confirm: true, user_metadata: { full_name: fullName, must_change_password: true },
         });
         if (createError || !created.user) return fail(400, createError?.message || "No se pudo crear la cuenta.");
         const { error: saveError } = await admin.from("profiles").update({
-          email, full_name: fullName, role, organization_id: organizationId,
+          email, full_name: fullName, role, organization_id: assignedOrganizationId,
         }).eq("id", created.user.id);
         if (saveError) {
           await admin.auth.admin.deleteUser(created.user.id);
           return fail(500, "La cuenta fue revertida porque no se pudo guardar su perfil: " + saveError.message);
         }
-        await audit("user_created", "user", created.user.id, { email, role, organization_id: organizationId });
+        await audit("user_created", "user", created.user.id, { email, role, organization_id: assignedOrganizationId });
         return jsonResponse(200, { success: true, message: "Usuario creado. Se exigirá cambiar la contraseña temporal al iniciar sesión." });
       }
       case "update_user": {
         const id = textValue(payload.id, 64);
-        if (!id || id === caller.id) return fail(400, "No puede modificar su propia cuenta desde esta consola.");
+        if (!id) return fail(400, "Seleccione un usuario.");
         const { data: current, error: currentError } = await admin.from("profiles")
           .select("id,email,role,organization_id").eq("id", id).maybeSingle();
         dbError(currentError);
         if (!current) return fail(404, "Usuario no encontrado.");
-        if (current.role === "superadmin") return fail(403, "La cuenta superadministradora se administra fuera de esta tabla.");
+
         const email = textValue(payload.email, 254).toLowerCase();
         const fullName = textValue(payload.full_name, 180);
         const role = textValue(payload.role, 30);
         const organizationId = textValue(payload.organization_id, 64);
-        if (!validEmail(email) || fullName.length < 2 || !["staff","admin","volunteer"].includes(role)) {
+        const assignedOrganizationId = role === "superadmin" ? null : organizationId;
+        if (!validEmail(email) || fullName.length < 2 ||
+            !["staff","admin","volunteer","superadmin"].includes(role)) {
           return fail(400, "Revise correo, nombre y rol.");
         }
-        await requireOrganization(organizationId);
+        if (role !== "superadmin") await requireOrganization(organizationId);
+        if (current.role === "superadmin" && role !== "superadmin") {
+          await requireAnotherActiveSuperadmin(id);
+        }
+
         const { data: authResult, error: getAuthError } = await admin.auth.admin.getUserById(id);
         if (getAuthError || !authResult.user) return fail(404, "No se encontró la cuenta de autenticación.");
         const { error: authUpdateError } = await admin.auth.admin.updateUserById(id, {
@@ -242,15 +260,28 @@ Deno.serve(async (req: Request) => {
           user_metadata: { ...authResult.user.user_metadata, full_name: fullName },
         });
         if (authUpdateError) throw new Error(authUpdateError.message);
-        const { error } = await admin.from("profiles").update({
-          email, full_name: fullName, role, organization_id: organizationId,
+
+        const { error: profileUpdateError } = await admin.from("profiles").update({
+          email, full_name: fullName, role, organization_id: assignedOrganizationId,
         }).eq("id", id);
-        dbError(error);
+        if (profileUpdateError) {
+          if ((authResult.user.email || "").toLowerCase() !== email) {
+            const { error: rollbackError } = await admin.auth.admin.updateUserById(id, {
+              email: authResult.user.email || current.email,
+              email_confirm: true,
+            });
+            if (rollbackError) console.error("No se pudo revertir el correo de Auth tras un fallo al actualizar el perfil:", rollbackError.message);
+          }
+          throw new Error(profileUpdateError.message);
+        }
+
         await audit("user_updated", "user", id, {
           previous_email: current.email, email, previous_role: current.role, role,
-          previous_organization_id: current.organization_id, organization_id: organizationId,
+          previous_organization_id: current.organization_id, organization_id: assignedOrganizationId,
         });
-        return jsonResponse(200, { success: true, message: "Perfil y permisos actualizados." });
+        return jsonResponse(200, { success: true, message: role === "superadmin"
+          ? "Perfil guardado como superadministrador global."
+          : "Perfil, organización y permisos actualizados." });
       }
       case "reset_password": {
         const id = textValue(payload.id, 64);
@@ -259,7 +290,7 @@ Deno.serve(async (req: Request) => {
         if (password.length < 14 || password.length > 128) return fail(400, "La contraseña temporal debe tener al menos 14 caracteres.");
         const { data: target, error: targetError } = await admin.from("profiles").select("email,role").eq("id", id).maybeSingle();
         dbError(targetError);
-        if (!target || target.role === "superadmin") return fail(404, "Usuario no encontrado o no administrable.");
+        if (!target) return fail(404, "Usuario no encontrado.");
         const { data: authResult, error: getError } = await admin.auth.admin.getUserById(id);
         if (getError || !authResult.user) return fail(404, "No se encontró la cuenta.");
         const { error } = await admin.auth.admin.updateUserById(id, {
@@ -276,7 +307,8 @@ Deno.serve(async (req: Request) => {
         if (!id || id === caller.id) return fail(400, "No puede suspender su propia cuenta.");
         const { data: target, error } = await admin.from("profiles").select("email,role,organization_id").eq("id", id).maybeSingle();
         dbError(error);
-        if (!target || target.role === "superadmin") return fail(404, "Usuario no encontrado o no administrable.");
+        if (!target) return fail(404, "Usuario no encontrado.");
+        if (suspended && target.role === "superadmin") await requireAnotherActiveSuperadmin(id);
         const { error: authError } = await admin.auth.admin.updateUserById(id, {
           ban_duration: suspended ? "876000h" : "none",
         });
@@ -289,7 +321,8 @@ Deno.serve(async (req: Request) => {
         if (!id || id === caller.id) return fail(400, "No puede eliminar su propia cuenta.");
         const { data: target, error: targetProfileError } = await admin.from("profiles").select("email,role,organization_id").eq("id", id).maybeSingle();
         dbError(targetProfileError);
-        if (!target || target.role === "superadmin") return fail(404, "Usuario no encontrado o no administrable.");
+        if (!target) return fail(404, "Usuario no encontrado.");
+        if (target.role === "superadmin") await requireAnotherActiveSuperadmin(id);
         if (target.role === "admin" && target.organization_id) {
           const { count, error: countError } = await admin.from("profiles").select("id", { count: "exact", head: true })
             .eq("organization_id", target.organization_id).eq("role", "admin");

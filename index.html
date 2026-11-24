@@ -209,14 +209,14 @@
           <input id="superUserId" type="hidden">
           <label>Nombre completo<input id="superUserName" maxlength="180" required></label>
           <label>Correo electrónico<input id="superUserEmail" type="email" maxlength="254" required></label>
-          <label>Organización<select id="superUserOrganization" required></select></label>
-          <label>Rol<select id="superUserRole"><option value="staff">Personal</option><option value="admin">Administrador</option><option value="volunteer">Voluntario</option></select></label>
+          <label id="superUserOrganizationLabel">Organización<select id="superUserOrganization" required></select></label>
+          <label>Rol<select id="superUserRole"><option value="staff">Personal</option><option value="admin">Administrador</option><option value="volunteer">Voluntario</option><option value="superadmin">Superadministrador global</option></select></label>
           <label id="superUserPasswordLabel">Contraseña temporal<input id="superUserPassword" type="password" minlength="14" maxlength="128" autocomplete="new-password" placeholder="Mínimo 14 caracteres"></label>
           <div class="form-actions"><button class="primary" type="submit" id="superUserSaveBtn">Crear usuario</button><button class="secondary" id="superUserClearBtn" type="button">Limpiar</button></div>
         </form><p id="superUserMessage" class="message" role="status"></p>
         <p class="muted">Las contraseñas temporales exigen 14 caracteres como mínimo. La primera vez que ingrese, el usuario tendrá que establecer una contraseña nueva.</p>
       </div>
-      <div class="panel"><h2>Cuentas y perfiles</h2><p class="muted">Puede cambiar nombre, correo, organización y rol; suspender, reactivar, restablecer la clave o eliminar cuentas. La cuenta superadministradora no se administra desde esta tabla.</p><div id="superUsersTable" class="table-wrap"></div></div>
+      <div class="panel"><h2>Cuentas y perfiles</h2><p class="muted">Puede administrar todos los perfiles, incluidos los superadministradores: crear, editar identidad, cambiar organización y rol, restablecer contraseñas, suspender, reactivar o eliminar. La plataforma exige conservar al menos un superadministrador activo.</p><div id="superUsersTable" class="table-wrap"></div></div>
     </section>
     <section id="super-view-activities" class="super-view hidden">
       <div class="panel"><h2>Crear o modificar evento</h2>
