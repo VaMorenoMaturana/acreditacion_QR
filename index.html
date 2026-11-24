@@ -49,6 +49,16 @@
   <div class="divider"></div>
   <button id="showLoginBtn" class="secondary" type="button">Volver al inicio de sesión</button>
 </section>
+<section id="passwordChangeView" class="auth panel hidden">
+  <h1>Actualización obligatoria de contraseña</h1>
+  <p class="muted">Su administrador le asignó una contraseña temporal. Antes de continuar, establezca una contraseña personal y única de al menos 14 caracteres.</p>
+  <form id="passwordChangeForm">
+    <label>Nueva contraseña<input id="forcedNewPassword" type="password" minlength="14" maxlength="128" autocomplete="new-password" required></label>
+    <label>Confirmar nueva contraseña<input id="forcedNewPasswordConfirm" type="password" minlength="14" maxlength="128" autocomplete="new-password" required></label>
+    <button class="primary" type="submit">Actualizar contraseña y continuar</button>
+    <p id="passwordChangeMessage" class="message" role="status"></p>
+  </form>
+</section>
 <section id="appView" class="hidden">
   <nav class="tabs" aria-label="Módulos">
     <button data-tab="dashboard" class="active">Resumen</button>
