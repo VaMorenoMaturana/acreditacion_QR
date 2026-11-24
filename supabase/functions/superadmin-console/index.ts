@@ -142,15 +142,15 @@ Deno.serve(async (req: Request) => {
         let result;
         if (id) {
           const current = await requireOrganization(id);
-          const { data, error } = await admin.from("organizations").update({ name }).eq("id", id)
+          const response = await admin.from("organizations").update({ name }).eq("id", id)
             .select("id,name,slug,created_at,created_by").single();
-          dbError(error); result = data;
+          dbError(response.error); result = response.data;
           await audit("organization_updated", "organization", id, { previous_name: current.name, name });
         } else {
-          const { data, error } = await admin.from("organizations").insert({
+          const response = await admin.from("organizations").insert({
             name, slug: slugify(name), created_by: caller.id,
           }).select("id,name,slug,created_at,created_by").single();
-          dbError(error); result = data;
+          dbError(response.error); result = response.data;
           await audit("organization_created", "organization", result.id, { name });
         }
         return jsonResponse(200, { organization: result });
@@ -273,6 +273,8 @@ Deno.serve(async (req: Request) => {
           user_metadata: { ...authResult.user.user_metadata, must_change_password: true },
         });
         dbError(error);
+        const { error: revokeError } = await admin.auth.admin.signOut(id, "global");
+        if (revokeError) console.warn("No se pudieron revocar todas las sesiones del usuario:", revokeError.message);
         await audit("user_password_reset", "user", id, { email: target.email });
         return jsonResponse(200, { success: true, message: "Contraseña temporal cambiada. El usuario deberá reemplazarla al iniciar sesión." });
       }
@@ -287,6 +289,10 @@ Deno.serve(async (req: Request) => {
           ban_duration: suspended ? "876000h" : "none",
         });
         dbError(authError);
+        if (suspended) {
+          const { error: revokeError } = await admin.auth.admin.signOut(id, "global");
+          if (revokeError) console.warn("No se pudieron revocar todas las sesiones del usuario:", revokeError.message);
+        }
         await audit(suspended ? "user_suspended" : "user_reactivated", "user", id, { email: target.email });
         return jsonResponse(200, { success: true, message: suspended ? "Cuenta suspendida." : "Cuenta reactivada." });
       }
@@ -336,10 +342,14 @@ Deno.serve(async (req: Request) => {
           tagline: textValue(payload.tagline, 1000) || null,
           status: payload.status === "closed" ? "closed" : "open",
         };
-        let data, error;
-        if (id) ({ data, error } = await admin.from("activities").update(values).eq("id", id).eq("organization_id", organizationId).select().single());
-        else ({ data, error } = await admin.from("activities").insert({ ...values, created_by: caller.id }).select().single());
-        dbError(error);
+        let data;
+        if (id) {
+          const response = await admin.from("activities").update(values).eq("id", id).eq("organization_id", organizationId).select().single();
+          dbError(response.error); data = response.data;
+        } else {
+          const response = await admin.from("activities").insert({ ...values, created_by: caller.id }).select().single();
+          dbError(response.error); data = response.data;
+        }
         await audit(id ? "activity_updated" : "activity_created", "activity", data.id, { name, organization_id: organizationId });
         return jsonResponse(200, { success: true, activity: data });
       }
@@ -379,10 +389,14 @@ Deno.serve(async (req: Request) => {
         if (name.length < 2 || !validLayout(layout)) return fail(400, "Nombre o distribución inválida. El plano admite 1–100 filas, hasta 6 bloques por fila y 3.000 asientos.");
         await requireOrganization(organizationId);
         const values = { organization_id: organizationId, name, description: description || null, layout, updated_at: new Date().toISOString() };
-        let data, error;
-        if (id) ({ data, error } = await admin.from("auditorium_templates").update(values).eq("id", id).eq("organization_id", organizationId).select().single());
-        else ({ data, error } = await admin.from("auditorium_templates").insert({ ...values, created_by: caller.id }).select().single());
-        dbError(error);
+        let data;
+        if (id) {
+          const response = await admin.from("auditorium_templates").update(values).eq("id", id).eq("organization_id", organizationId).select().single();
+          dbError(response.error); data = response.data;
+        } else {
+          const response = await admin.from("auditorium_templates").insert({ ...values, created_by: caller.id }).select().single();
+          dbError(response.error); data = response.data;
+        }
         await audit(id ? "auditorium_updated" : "auditorium_created", "auditorium", data.id, { name, organization_id: organizationId });
         return jsonResponse(200, { success: true, auditorium: data });
       }
@@ -422,10 +436,28 @@ Deno.serve(async (req: Request) => {
         const status = textValue(payload.status, 30);
         const seatRow = textValue(payload.seat_row, 40), seatNumber = textValue(payload.seat_number, 40);
         if (!["registered","checked_in","cancelled"].includes(status)) return fail(400, "Estado inválido.");
+        const { data: current, error: currentError } = await admin.from("registrations")
+          .select("id,organization_id,activity_id,qr_token").eq("id", id).maybeSingle();
+        dbError(currentError);
+        if (!current) return fail(404, "Inscripción no encontrada.");
         const { data, error } = await admin.from("registrations")
           .update({ status, seat_row: seatRow || null, seat_number: seatNumber || null })
           .eq("id", id).select("id,organization_id,status,seat_row,seat_number").single();
         dbError(error);
+        if (status === "checked_in") {
+          const { count, error: countError } = await admin.from("check_ins").select("id",{count:"exact",head:true}).eq("registration_id",id);
+          dbError(countError);
+          if ((count || 0) === 0) {
+            const { error: insertError } = await admin.from("check_ins").insert({
+              organization_id:current.organization_id,registration_id:id,activity_id:current.activity_id,
+              token:current.qr_token,checked_in_by:caller.id,
+            });
+            dbError(insertError);
+          }
+        } else {
+          const { error: deleteError } = await admin.from("check_ins").delete().eq("registration_id",id);
+          dbError(deleteError);
+        }
         await audit("registration_updated", "registration", id, { status, seat_row: seatRow, seat_number: seatNumber });
         return jsonResponse(200, { success: true, registration: data });
       }
