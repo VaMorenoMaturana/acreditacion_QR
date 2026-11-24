@@ -338,36 +338,40 @@ grant select, insert, update, delete on table public.auditorium_templates to aut
 -- Admin-created staff accounts have no organization metadata and are provisioned by the admin Edge Function.
 create or replace function public.handle_new_user()
 returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_org_name text;
-  v_full_name text;
-  v_slug_base text;
-  v_slug text;
-  v_org_id uuid;
+as $function$
 begin
-  v_org_name := btrim(coalesce(new.raw_user_meta_data ->> 'organization_name', ''));
-  v_full_name := nullif(btrim(coalesce(new.raw_user_meta_data ->> 'full_name', '')), '');
-
-  if v_org_name <> '' then
-    if char_length(v_org_name) < 2 or char_length(v_org_name) > 180 then
+  if btrim(coalesce(new.raw_user_meta_data ->> 'organization_name', '')) <> '' then
+    if char_length(btrim(new.raw_user_meta_data ->> 'organization_name')) < 2
+       or char_length(btrim(new.raw_user_meta_data ->> 'organization_name')) > 180 then
       raise exception 'El nombre de la organización debe tener entre 2 y 180 caracteres';
     end if;
 
-    v_slug_base := lower(regexp_replace(v_org_name, '[^a-zA-Z0-9]+', '-', 'g'));
-    v_slug_base := trim(both '-' from v_slug_base);
-    if v_slug_base = '' then v_slug_base := 'organizacion'; end if;
-    v_slug := left(v_slug_base, 44) || '-' || substr(replace(new.id::text, '-', ''), 1, 8);
-
     insert into public.organizations(name, slug, created_by)
-    values (v_org_name, v_slug, new.id)
-    returning id into v_org_id;
+    values (
+      btrim(new.raw_user_meta_data ->> 'organization_name'),
+      left(
+        trim(both '-' from lower(regexp_replace(btrim(new.raw_user_meta_data ->> 'organization_name'), '[^a-zA-Z0-9]+', '-', 'g'))),
+        44
+      ) || '-' || substr(replace(new.id::text, '-', ''), 1, 8),
+      new.id
+    );
 
     insert into public.profiles(id, email, full_name, role, organization_id)
-    values (new.id, new.email, v_full_name, 'admin', v_org_id)
+    select
+      new.id,
+      new.email,
+      nullif(btrim(coalesce(new.raw_user_meta_data ->> 'full_name', '')), ''),
+      'admin',
+      o.id
+    from public.organizations o
+    where o.created_by = new.id
+      and o.slug = (
+        left(
+          trim(both '-' from lower(regexp_replace(btrim(new.raw_user_meta_data ->> 'organization_name'), '[^a-zA-Z0-9]+', '-', 'g'))),
+          44
+        ) || '-' || substr(replace(new.id::text, '-', ''), 1, 8)
+      )
+    limit 1
     on conflict (id) do update
       set email = excluded.email,
           full_name = excluded.full_name,
@@ -375,7 +379,12 @@ begin
           organization_id = excluded.organization_id;
   else
     insert into public.profiles(id, email, full_name, role)
-    values (new.id, new.email, v_full_name, 'staff')
+    values (
+      new.id,
+      new.email,
+      nullif(btrim(coalesce(new.raw_user_meta_data ->> 'full_name', '')), ''),
+      'staff'
+    )
     on conflict (id) do update
       set email = excluded.email,
           full_name = coalesce(excluded.full_name, public.profiles.full_name);
@@ -383,7 +392,7 @@ begin
 
   return new;
 end;
-$$;
+$function$ language plpgsql security definer set search_path = '';
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
