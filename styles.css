@@ -25,3 +25,15 @@
 #manualCheckinList table{min-width:680px}
 #manualCheckinList th,#manualCheckinList td{vertical-align:middle}
 #manualCheckinSearch{margin-top:4px}
+
+
+/* Consola global del superadministrador */
+.admin-subnav{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 20px;padding:8px;background:#f2f0f5;border-radius:12px}
+.admin-subnav button{border:1px solid transparent;background:transparent;color:#51485b;padding:9px 13px;border-radius:8px;font:inherit;cursor:pointer}
+.admin-subnav button.active{background:#fff;border-color:#ded8e6;color:#21152c;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.super-view>.panel{margin-bottom:18px}
+.super-view table{min-width:760px}
+.super-reg-input{min-width:120px;max-width:190px}
+.super-reg-input.short{min-width:64px;max-width:90px;width:80px}
+#superAuditoriumLayout{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5}
+@media(max-width:760px){.admin-subnav{overflow-x:auto;flex-wrap:nowrap}.admin-subnav button{white-space:nowrap}}
