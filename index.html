@@ -58,6 +58,7 @@
     <button data-tab="checkin">Acreditación QR</button>
     <button data-goto="auditorio">Asignación de asientos</button>
     <button data-tab="admin" id="adminTab">Administración</button>
+    <button data-tab="superadmin" id="superadminTab" class="hidden">Control global</button>
   </nav>
   <section id="tab-dashboard" class="tab-panel">
     <div class="page-head"><div><h1>Resumen</h1><p class="muted">Estado de las actividades y acreditaciones.</p></div><button class="primary" data-goto="activities">Crear actividad</button></div>
@@ -159,6 +160,93 @@
     <div class="panel"><h2>Usuarios registrados</h2><p class="muted">Cambie el rol de acceso de las cuentas existentes desde esta tabla.</p><div id="usersTable" class="table-wrap"></div></div>
     <div class="panel"><h2>Notas de seguridad</h2><ul><li>La creación de cuentas se ejecuta en una función segura de Supabase; la clave privilegiada nunca se expone en el navegador.</li><li>Las cuentas se crean con correo y contraseña asignados por un administrador; no se envían invitaciones.</li><li>Asigne el rol de administrador solo a personas que realmente deban gestionar usuarios y permisos.</li><li>Active MFA en las cuentas administrativas cuando esté disponible para su proyecto.</li></ul></div>
   </section>
+
+  <section id="tab-superadmin" class="tab-panel hidden">
+    <div class="page-head"><div><h1>Control global de Espacio Acredita</h1><p class="muted">Consola reservada al superadministrador de la plataforma. Las organizaciones mantienen sus datos aislados entre sí.</p></div></div>
+    <div class="admin-subnav">
+      <button type="button" data-super-view="overview" class="active">Resumen</button>
+      <button type="button" data-super-view="organizations">Organizaciones</button>
+      <button type="button" data-super-view="users">Usuarios y perfiles</button>
+      <button type="button" data-super-view="activities">Eventos</button>
+      <button type="button" data-super-view="auditoriums">Auditorios</button>
+      <button type="button" data-super-view="registrations">Inscripciones</button>
+      <button type="button" data-super-view="audit">Auditoría</button>
+    </div>
+    <section id="super-view-overview" class="super-view">
+      <div class="stats">
+        <article class="stat"><span>Organizaciones</span><strong id="superCountOrganizations">—</strong></article>
+        <article class="stat"><span>Usuarios</span><strong id="superCountProfiles">—</strong></article>
+        <article class="stat"><span>Eventos</span><strong id="superCountActivities">—</strong></article>
+        <article class="stat"><span>Inscripciones</span><strong id="superCountRegistrations">—</strong></article>
+        <article class="stat"><span>Auditorios</span><strong id="superCountAuditoriums">—</strong></article>
+        <article class="stat"><span>Acreditaciones</span><strong id="superCountCheckins">—</strong></article>
+      </div>
+      <div class="panel"><div class="page-head"><div><h2>Estado de la plataforma</h2><p class="muted">Indicadores globales y actividad de todas las organizaciones.</p></div><button type="button" class="secondary" id="superRefreshBtn">Actualizar datos</button></div><div id="superOverviewNote" class="message" role="status"></div></div>
+    </section>
+    <section id="super-view-organizations" class="super-view hidden">
+      <div class="panel"><h2>Crear o modificar organización</h2>
+        <form id="superOrganizationForm" class="form-grid">
+          <input id="superOrganizationId" type="hidden">
+          <label class="span-2">Nombre de la organización<input id="superOrganizationName" maxlength="180" required></label>
+          <div class="form-actions"><button class="primary" type="submit" id="superOrganizationSaveBtn">Crear organización</button><button class="secondary" id="superOrganizationClearBtn" type="button">Limpiar</button></div>
+        </form><p id="superOrganizationMessage" class="message" role="status"></p>
+      </div>
+      <div class="panel"><h2>Organizaciones registradas</h2><p class="muted">La eliminación es definitiva: borra sus eventos, inscritos, auditorios, usuarios y acreditaciones asociadas. Exige confirmación del nombre.</p><div id="superOrganizationsTable" class="table-wrap"></div></div>
+    </section>
+    <section id="super-view-users" class="super-view hidden">
+      <div class="panel"><h2>Crear o modificar usuario</h2>
+        <form id="superUserForm" class="form-grid">
+          <input id="superUserId" type="hidden">
+          <label>Nombre completo<input id="superUserName" maxlength="180" required></label>
+          <label>Correo electrónico<input id="superUserEmail" type="email" maxlength="254" required></label>
+          <label>Organización<select id="superUserOrganization" required></select></label>
+          <label>Rol<select id="superUserRole"><option value="staff">Personal</option><option value="admin">Administrador</option><option value="volunteer">Voluntario</option></select></label>
+          <label id="superUserPasswordLabel">Contraseña temporal<input id="superUserPassword" type="password" minlength="14" maxlength="128" autocomplete="new-password" placeholder="Mínimo 14 caracteres"></label>
+          <div class="form-actions"><button class="primary" type="submit" id="superUserSaveBtn">Crear usuario</button><button class="secondary" id="superUserClearBtn" type="button">Limpiar</button></div>
+        </form><p id="superUserMessage" class="message" role="status"></p>
+        <p class="muted">Las contraseñas temporales exigen 14 caracteres como mínimo. La primera vez que ingrese, el usuario tendrá que establecer una contraseña nueva.</p>
+      </div>
+      <div class="panel"><h2>Cuentas y perfiles</h2><p class="muted">Puede cambiar nombre, correo, organización y rol; suspender, reactivar, restablecer la clave o eliminar cuentas. La cuenta superadministradora no se administra desde esta tabla.</p><div id="superUsersTable" class="table-wrap"></div></div>
+    </section>
+    <section id="super-view-activities" class="super-view hidden">
+      <div class="panel"><h2>Crear o modificar evento</h2>
+        <form id="superActivityForm" class="form-grid">
+          <input id="superActivityId" type="hidden">
+          <label class="span-2">Organización<select id="superActivityOrganization" required></select></label>
+          <label>Nombre del evento<input id="superActivityName" maxlength="180" required></label>
+          <label>Lugar<input id="superActivityPlace" maxlength="180" required></label>
+          <label>Fecha<input id="superActivityDate" type="date" required></label>
+          <label>Hora de inicio<input id="superActivityStart" type="time" required></label>
+          <label>Hora de término<input id="superActivityEnd" type="time"></label>
+          <label>Estado<select id="superActivityStatus"><option value="open">Abierto</option><option value="closed">Cerrado</option></select></label>
+          <label class="span-2">Descripción<textarea id="superActivityDescription" rows="2"></textarea></label>
+          <label class="span-2">Texto institucional<textarea id="superActivityTagline" rows="2"></textarea></label>
+          <div class="form-actions"><button class="primary" type="submit" id="superActivitySaveBtn">Crear evento</button><button class="secondary" type="button" id="superActivityClearBtn">Limpiar</button></div>
+        </form><p id="superActivityMessage" class="message" role="status"></p>
+      </div>
+      <div class="panel"><div class="page-head"><div><h2>Eventos</h2><p class="muted">Todos los eventos de la plataforma.</p></div><label>Filtrar organización<select id="superActivityFilter"></select></label></div><div id="superActivitiesTable" class="table-wrap"></div></div>
+    </section>
+    <section id="super-view-auditoriums" class="super-view hidden">
+      <div class="panel"><h2>Crear o modificar auditorio</h2>
+        <form id="superAuditoriumForm" class="form-grid">
+          <input id="superAuditoriumId" type="hidden">
+          <label class="span-2">Organización<select id="superAuditoriumOrganization" required></select></label>
+          <label>Nombre<input id="superAuditoriumName" maxlength="120" required></label>
+          <label>Descripción<input id="superAuditoriumDescription" maxlength="1000"></label>
+          <label class="span-2">Distribución del auditorio (JSON)<textarea id="superAuditoriumLayout" rows="12" required></textarea></label>
+          <div class="form-actions"><button class="primary" type="submit" id="superAuditoriumSaveBtn">Crear auditorio</button><button class="secondary" type="button" id="superAuditoriumClearBtn">Limpiar</button></div>
+        </form><p class="muted">El plano admite hasta 100 filas, 6 bloques por fila y 3.000 asientos. Puede editar el JSON aquí; la herramienta visual de construcción sigue disponible dentro de cada organización.</p><p id="superAuditoriumMessage" class="message" role="status"></p>
+      </div>
+      <div class="panel"><div class="page-head"><div><h2>Plantillas de auditorios</h2></div><label>Filtrar organización<select id="superAuditoriumFilter"></select></label></div><div id="superAuditoriumsTable" class="table-wrap"></div></div>
+    </section>
+    <section id="super-view-registrations" class="super-view hidden">
+      <div class="panel"><div class="page-head"><div><h2>Inscripciones y participantes</h2><p class="muted">Consulta global, modificación de estado/asientos y eliminación de inscripciones.</p></div><label>Filtrar organización<select id="superRegistrationFilter"></select></label></div><div id="superRegistrationsTable" class="table-wrap"></div></div>
+    </section>
+    <section id="super-view-audit" class="super-view hidden">
+      <div class="panel"><h2>Registro de auditoría global</h2><p class="muted">Acciones administrativas realizadas desde esta consola.</p><div id="superAuditTable" class="table-wrap"></div></div>
+    </section>
+  </section>
+
 </section>
 </main>
 <div id="pdfStage" aria-hidden="true"></div>
