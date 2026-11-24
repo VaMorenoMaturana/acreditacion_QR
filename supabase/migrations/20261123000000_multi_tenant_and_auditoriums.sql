@@ -269,7 +269,7 @@ create or replace function public.prevent_organization_change()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $$
 begin
   if new.organization_id is distinct from old.organization_id then
     if tg_table_name = 'profiles'
@@ -282,7 +282,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.prevent_organization_change() from public, anon, authenticated;
 
