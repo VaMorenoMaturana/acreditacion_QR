@@ -163,18 +163,15 @@ Deno.serve(async (req: Request) => {
         const { data: profiles, error: pError } = await admin.from("profiles").select("id,role").eq("organization_id", id);
         dbError(pError);
         if ((profiles || []).some(p => p.role === "superadmin")) return fail(400, "No se puede eliminar una organización que contenga un superadministrador.");
-        const steps = [
-          () => admin.from("check_ins").delete().eq("organization_id", id),
-          () => admin.from("registrations").delete().eq("organization_id", id),
-          () => admin.from("activities").delete().eq("organization_id", id),
-          () => admin.from("auditorium_templates").delete().eq("organization_id", id),
-          () => admin.from("attendees").delete().eq("organization_id", id),
-          () => admin.from("audit_logs").delete().eq("organization_id", id),
-        ];
-        for (const step of steps) { const { error } = await step(); dbError(error); }
+        const { error: purgeError } = await admin.rpc("superadmin_purge_organization", {
+          p_organization_id: id,
+        });
+        dbError(purgeError);
+        // Auth users are deleted only after the transaction has removed their
+        // tenant-owned foreign-key references. Profiles were detached atomically.
         for (const profile of profiles || []) {
           const { error } = await admin.auth.admin.deleteUser(profile.id);
-          if (error) throw new Error("Se eliminaron los datos, pero no se pudo eliminar una de las cuentas: " + error.message);
+          if (error) throw new Error("Los datos de la organización fueron purgados, pero una cuenta no pudo eliminarse. Vuelva a intentarlo: " + error.message);
         }
         const { error } = await admin.from("organizations").delete().eq("id", id);
         dbError(error);
