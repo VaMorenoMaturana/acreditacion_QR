@@ -256,7 +256,7 @@ async function saveSeat(seat) {
 
 async function loadActivityRegistrations(activityId) {
   const { data, error } = await supabase.from("registrations")
-    .select("id,activity_id,seat_row,seat_number,status,attendees(full_name,organization)")
+    .select("id,activity_id,seat_row,seat_number,status,attendees!registrations_attendee_organization_fk(full_name,organization)")
     .eq("activity_id", activityId)
     .neq("status", "cancelled")
     .order("created_at", { ascending: true });
