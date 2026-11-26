@@ -37,3 +37,8 @@
 .super-reg-input.short{min-width:64px;max-width:90px;width:80px}
 #superAuditoriumLayout{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5}
 @media(max-width:760px){.admin-subnav{overflow-x:auto;flex-wrap:nowrap}.admin-subnav button{white-space:nowrap}}
+
+/* Registro: exportaciones CSV y errores de carga */
+.export-actions{margin:10px 0 4px}
+.error-message{color:#9b2828}
+.error-message:empty{display:none}
