@@ -124,13 +124,23 @@
 <div class="bulk-toolbar"><label class="select-all-label"><input id="selectAllRegistrations" type="checkbox"> Seleccionar todos los inscritos visibles</label><span id="selectionSummary" class="muted">0 seleccionados</span></div>
 <div id="registrationsTable" class="table-wrap"></div>
 <div class="bulk-actions"><div><strong>Acciones masivas</strong><p id="bulkDeleteMessage" class="message" role="status">Seleccione uno o más inscritos para eliminarlos conjuntamente.</p></div>
-<div class="bulk-buttons"><button id="deleteSelectedBtn" class="secondary danger-btn" type="button" disabled>Eliminar seleccionados</button><button id="deleteAllVisibleBtn" class="danger-solid" type="button" disabled>Eliminar todos los inscritos</button></div></div>
+<div class="bulk-buttons"><button id="downloadSelectedTicketsBtn" class="secondary" type="button" disabled>Descargar entradas seleccionadas (ZIP)</button><button id="deleteSelectedBtn" class="secondary danger-btn" type="button" disabled>Eliminar seleccionados</button><button id="deleteAllVisibleBtn" class="danger-solid" type="button" disabled>Eliminar todos los inscritos</button></div></div>
 </div>
   </section>
   <section id="tab-tickets" class="tab-panel hidden">
     <div class="page-head"><div><h1>Entradas PDF/ZIP</h1><p class="muted">El diseño de la entrada se basa en la plantilla proporcionada.</p></div></div>
+    <div class="panel"><h2>Diseño de entrada</h2>
+      <p class="muted">Seleccione una de las dos plantillas y ajuste sus colores. La plantilla horizontal conserva el diseño de Liderazgo en 100 Palabras; la vertical incorpora una composición genérica. Los ajustes se guardan en este navegador para la organización actual.</p>
+      <div class="form-grid ticket-design-controls">
+        <label class="span-2">Formato<select id="ticketTemplate"><option value="classic">Clásica horizontal · Liderazgo en 100 Palabras</option><option value="vertical">Moderna vertical · Genérica</option></select></label>
+        <label>Color de fondo<input id="ticketBackground" type="color" value="#3c7894"></label>
+        <label>Color de acento<input id="ticketAccent" type="color" value="#35105c"></label>
+        <label>Color de texto<input id="ticketTextColor" type="color" value="#fffdf8"></label>
+        <div class="form-actions"><button id="ticketResetDesignBtn" class="secondary" type="button">Restaurar colores del formato</button></div>
+      </div>
+    </div>
     <div class="panel"><div class="form-grid"><label class="span-2">Actividad<select id="ticketActivity"></select></label><label class="span-2">Persona inscrita<select id="ticketRegistration"></select></label></div>
-      <div class="form-actions"><button id="downloadOneBtn" class="primary">Descargar entrada PDF</button><button id="downloadZipBtn" class="secondary">Descargar todas las entradas (ZIP)</button></div><p id="ticketMessage" class="message" role="status"></p>
+      <div class="form-actions"><button id="downloadOneBtn" class="primary" type="button">Descargar entrada PDF</button><button id="downloadZipBtn" class="secondary" type="button">Descargar todas las entradas (ZIP)</button></div><p id="ticketMessage" class="message" role="status"></p>
     </div>
     <div class="panel"><h2>Vista previa</h2><div id="ticketPreview" class="ticket-preview"></div></div>
   </section>
