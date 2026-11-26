@@ -201,3 +201,16 @@ Las cuentas creadas desde la consola reciben una contraseña temporal de al meno
 - El restablecimiento de contraseña no invalida instantáneamente los JWT de acceso que ya estén emitidos; la contraseña nueva y el requisito de cambio aplican al siguiente inicio de sesión. La suspensión impide renovar sesiones, pero los JWT existentes pueden seguir válidos hasta su expiración.
 
 Ejecute primero las pruebas con una organización ficticia. Compruebe especialmente creación, edición, suspensión, restablecimiento, eliminación y el aislamiento de cada organización.
+
+
+## Exportación de inscritos y acreditados
+
+En **Inscripciones → Personas inscritas**, el personal de la organización puede filtrar una actividad o seleccionar todas y descargar dos archivos CSV:
+- **Exportar inscritos**: incluye las inscripciones no canceladas, tanto pendientes como acreditadas.
+- **Exportar acreditados**: incluye únicamente las inscripciones con estado `checked_in`.
+
+Los archivos incluyen nombre, correo, organización, evento, fecha y lugar, fila, asiento, estado, fecha de acreditación y fecha de inscripción. Se generan en UTF-8 con BOM y separador de punto y coma para facilitar su apertura en Excel. Las consultas se paginan para incluir más de 1.000 registros.
+
+### Relaciones de asistentes e inscripciones
+
+La migración multiempresa agrega una clave foránea compuesta entre `registrations` y `attendees` para impedir asociaciones entre organizaciones. Como también se conserva la clave foránea original, las consultas PostgREST que anidan asistentes deben indicar explícitamente `attendees!registrations_attendee_organization_fk(...)`; de lo contrario la relación es ambigua. Esta especificación se utiliza tanto en la lista de inscripciones como en el módulo de asignación de auditorios.
