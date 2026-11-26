@@ -1,5 +1,6 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { ticketMarkup } from "./ticket-template.js";
+import { ticketMarkupVertical } from "./ticket-template-vertical.js";
 import { initSuperadmin } from "./superadmin.js";
 
 const $ = id => document.getElementById(id);
@@ -10,6 +11,11 @@ const supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null, currentProfile = null, activities = [], registrations = [], checkins = [];
 const selectedRegistrationIds = new Set();
 let csvRows = [], scanner = null, logoData = {institution:"",project:"",partner:""};
+const TICKET_DEFAULT_COLORS = {
+ classic:{background:"#3c7894",accent:"#35105c",text:"#fffdf8"},
+ vertical:{background:"#190b28",accent:"#83b6d0",text:"#f8f4fb"}
+};
+let ticketSettings={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
 const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const say = (id, message, bad=false) => { const el=$(id); if(el){el.textContent=message;el.style.color=bad?"#9b2828":"";} };
 const val = id => $(id).value.trim();
@@ -38,6 +44,51 @@ function table(headers, rows){if(!rows.length)return '<p class="muted">Sin regis
 function activityOptions(selectId, includeAll=false){const select=$(selectId);if(!select)return;const old=select.value;select.innerHTML=(includeAll?'<option value="">Todas las actividades</option>':'')+activities.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}${a.status==="closed"?" (cerrada)":""}</option>`).join("");if([...select.options].some(o=>o.value===old))select.value=old;}
 function selectedActivity(id){return activities.find(a=>a.id===id);}
 function selectedRegistration(id){return registrations.find(r=>r.id===id);}
+function ticketSettingsKey(){return `espacio-acredita:ticket-design:${currentProfile?.organization_id||"sin-organizacion"}`;}
+function safeTicketColor(value,fallback){return /^#[0-9a-f]{6}$/i.test(String(value||""))?value:fallback;}
+function loadTicketSettings(){
+ const defaults={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+ try{
+  const saved=JSON.parse(localStorage.getItem(ticketSettingsKey())||"null");
+  if(!saved||typeof saved!=="object")return defaults;
+  const colors={};
+  for(const format of ["classic","vertical"]){
+   colors[format]={
+    background:safeTicketColor(saved.colors?.[format]?.background,defaults.colors[format].background),
+    accent:safeTicketColor(saved.colors?.[format]?.accent,defaults.colors[format].accent),
+    text:safeTicketColor(saved.colors?.[format]?.text,defaults.colors[format].text)
+   };
+  }
+  return {template:saved.template==="vertical"?"vertical":"classic",colors};
+ }catch(error){console.warn("No se pudieron leer los ajustes de entradas:",error);return defaults;}
+}
+function saveTicketSettings(){
+ try{localStorage.setItem(ticketSettingsKey(),JSON.stringify(ticketSettings));}
+ catch(error){console.warn("No se pudieron guardar los ajustes de entradas:",error);}
+}
+function updateTicketDesignControls(){
+ const format=$("ticketTemplate");if(!format)return;
+ format.value=ticketSettings.template;
+ const colors=ticketSettings.colors[ticketSettings.template];
+ $("ticketBackground").value=colors.background;
+ $("ticketAccent").value=colors.accent;
+ $("ticketTextColor").value=colors.text;
+}
+function selectTicketTemplate(){
+ ticketSettings.template=$("ticketTemplate").value==="vertical"?"vertical":"classic";
+ saveTicketSettings();updateTicketDesignControls();renderTicketPreview();
+}
+function changeTicketColors(){
+ const colors=ticketSettings.colors[ticketSettings.template];
+ colors.background=$("ticketBackground").value;
+ colors.accent=$("ticketAccent").value;
+ colors.text=$("ticketTextColor").value;
+ saveTicketSettings();renderTicketPreview();
+}
+function resetTicketDesignColors(){
+ ticketSettings.colors[ticketSettings.template]={...TICKET_DEFAULT_COLORS[ticketSettings.template]};
+ saveTicketSettings();updateTicketDesignControls();renderTicketPreview();
+}
 function ticketDateLabel(value){
  if(!value)return "—";
  const date=new Date(value+"T12:00:00Z");
@@ -154,6 +205,10 @@ function downloadRegistrationCsv(kind){
 function updateBulkSelectionUI(list=visibleRegistrations()){
   const ids=list.map(r=>r.id),selected=ids.filter(id=>selectedRegistrationIds.has(id)).length;
   $("selectionSummary").textContent=`${selectedRegistrationIds.size} seleccionados · ${list.length} visibles`;
+  const downloadable=list.filter(reg=>selectedRegistrationIds.has(reg.id)&&reg.status!=="cancelled").length;
+  const ticketButton=$("downloadSelectedTicketsBtn");
+  ticketButton.disabled=downloadable===0;
+  ticketButton.textContent=`Descargar entradas seleccionadas (${downloadable})`;
   $("deleteSelectedBtn").disabled=selectedRegistrationIds.size===0;
   $("deleteSelectedBtn").textContent=selectedRegistrationIds.size?`Eliminar seleccionados (${selectedRegistrationIds.size})`:"Eliminar seleccionados";
   $("deleteAllVisibleBtn").disabled=list.length===0;
@@ -316,10 +371,17 @@ async function importCsv(){
  await loadAll();refreshCsvDuplicateWarnings();
  say("csvMessage",'Importadas '+ok+' filas'+(duplicateImported?' (incluidas '+duplicateImported+' con correo repetido)':'')+'.'+(failed.length?' Errores: '+failed.slice(0,5).join(" | "):''),failed.length>0);
 }
-function ticketDocument(reg){
+function ticketDocument(reg,design=ticketSettings){
  const a=selectedActivity(reg.activity_id);if(!a)throw new Error("No se encontró la actividad de esta inscripción.");
- const host=document.createElement("div");host.innerHTML=`<article class="ticket">${ticketMarkup}</article>`;
+ const format=design.template==="vertical"?"vertical":"classic";
+ const markup=format==="vertical"?ticketMarkupVertical:ticketMarkup;
+ const host=document.createElement("div");
+ host.innerHTML=`<article class="ticket ${format==="vertical"?"ticket--vertical":""}">${markup}</article>`;
  const root=host.querySelector(".ticket");
+ const colors=design.colors?.[format]||TICKET_DEFAULT_COLORS[format];
+ root.style.setProperty("--ticket-background",safeTicketColor(colors.background,TICKET_DEFAULT_COLORS[format].background));
+ root.style.setProperty("--ticket-accent",safeTicketColor(colors.accent,TICKET_DEFAULT_COLORS[format].accent));
+ root.style.setProperty("--ticket-text",safeTicketColor(colors.text,TICKET_DEFAULT_COLORS[format].text));
  const set=(id,text)=>{const el=root.querySelector("#"+id);if(el)el.textContent=text||"";};
  set("previewPerson",reg.attendee.full_name);set("previewOrg",reg.attendee.organization||"");
  set("previewEventName",a.name);set("previewEventDesc",a.tagline||a.description||"");
@@ -329,7 +391,7 @@ function ticketDocument(reg){
  if(seatLabels[0])seatLabels[0].textContent=`FILA: ${reg.seat_row||"-"}`;
  if(seatLabels[1])seatLabels[1].textContent=`ASIENTO: ${reg.seat_number||"-"}`;
  const imgs=[["logoPreview",a.institution_logo],["projectLogoPreview",a.project_logo],["partnerLogoPreview",a.partner_logo]];
- imgs.forEach(([id,src])=>{const img=root.querySelector("#"+id);if(src){img.src=src;img.hidden=false;img.style.display="block";}else img.remove();});
+ imgs.forEach(([id,src])=>{const img=root.querySelector("#"+id);if(src){img.src=src;img.hidden=false;img.style.display="block";}else if(img)img.remove();});
  const qr=root.querySelector("#qrPreview");qr.removeAttribute("src");qr.alt="Código QR";
  const qrHolder=document.createElement("div");qrHolder.style.cssText="position:absolute;left:-99999px;top:0";
  document.body.appendChild(qrHolder);
@@ -346,7 +408,7 @@ function resizeTicketPreview(){
 function renderTicketPreview(){
  const id=$("ticketRegistration").value,reg=selectedRegistration(id),preview=$("ticketPreview");preview.innerHTML="";if(!reg)return;
  try{
-  const frame=document.createElement("div");frame.className="ticket-preview-frame";
+  const frame=document.createElement("div");frame.className="ticket-preview-frame"+(ticketSettings.template==="vertical"?" ticket-preview-vertical":"");
   frame.appendChild(ticketDocument(reg));preview.appendChild(frame);resizeTicketPreview();
  }catch(e){preview.textContent=e.message;}
 }
@@ -362,15 +424,15 @@ function pdfWorker(root,scale=2){
     if(stage)Object.assign(stage.style,{left:"0px",top:"0px",opacity:"1",zIndex:"9999"});
    }
   },
-  jsPDF:{unit:"mm",format:[303,104.08],orientation:"landscape"}
+  jsPDF:{unit:"mm",format:root.classList.contains("ticket--vertical")?[96,156]:[303,104.08],orientation:root.classList.contains("ticket--vertical")?"portrait":"landscape"}
  }).from(root);
 }
 async function waitForTicketImages(root){
  const images=[...root.querySelectorAll("img")].filter(image=>image.getAttribute("src"));
  await Promise.all(images.map(image=>image.decode()));
 }
-async function downloadPdf(reg){
- const root=ticketDocument(reg),stage=$("pdfStage");
+async function downloadPdf(reg,design=ticketSettings){
+ const root=ticketDocument(reg,design),stage=$("pdfStage");
  stage.innerHTML="";stage.appendChild(root);
  try{
   await waitForTicketImages(root);
@@ -378,13 +440,46 @@ async function downloadPdf(reg){
   await pdfWorker(root).set({filename:`entrada-${name}.pdf`}).save();
  }finally{stage.innerHTML="";}
 }
-async function downloadOne(){const reg=selectedRegistration($("ticketRegistration").value);if(!reg){say("ticketMessage","Selecciona una inscripción.",true);return;}try{await downloadPdf(reg);say("ticketMessage","PDF generado.");}catch(e){say("ticketMessage",e.message,true);}}
+async function downloadOne(){
+ const reg=selectedRegistration($("ticketRegistration").value);
+ if(!reg){say("ticketMessage","Selecciona una inscripción.",true);return;}
+ try{await downloadPdf(reg,ticketSettings);say("ticketMessage","PDF generado con el diseño seleccionado.");}
+ catch(error){say("ticketMessage",error.message,true);}
+}
+async function downloadTicketZip(list,downloadName,button){
+ const valid=list.filter(reg=>reg&&reg.status!=="cancelled");
+ if(!valid.length){say("ticketMessage","No hay inscritos vigentes para generar las entradas.",true);return;}
+ const originalText=button.textContent;button.disabled=true;button.textContent="Generando ZIP…";
+ const design=JSON.parse(JSON.stringify(ticketSettings));
+ try{
+  const zip=new JSZip(),stage=$("pdfStage");
+  for(let i=0;i<valid.length;i++){
+   const reg=valid[i],root=ticketDocument(reg,design);
+   stage.innerHTML="";stage.appendChild(root);
+   await waitForTicketImages(root);
+   const pdf=await pdfWorker(root,1.6).toPdf().get("pdf");
+   const safe=(reg.attendee.full_name||"entrada").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);
+   zip.file(`${String(i+1).padStart(3,"0")}-${safe}.pdf`,pdf.output("blob"));
+   $("ticketMessage").textContent=`Generando entradas: ${i+1}/${valid.length}…`;
+  }
+  stage.innerHTML="";
+  const blob=await zip.generateAsync({type:"blob"});
+  const url=URL.createObjectURL(blob),link=document.createElement("a");
+  link.href=url;link.download=`espacio-acredita-${downloadName}.zip`;
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  say("ticketMessage",`ZIP generado con ${valid.length} entradas en formato ${design.template==="vertical"?"vertical":"horizontal"}.`);
+ }catch(error){
+  $("pdfStage").innerHTML="";say("ticketMessage",error?.message||"No se pudo generar el ZIP.",true);
+ }finally{button.disabled=false;button.textContent=originalText;}
+}
 async function downloadZip(){
- const aid=val("ticketActivity"),list=registrations.filter(r=>r.activity_id===aid&&r.status!=="cancelled");if(!list.length){say("ticketMessage","No hay inscripciones para esta actividad.",true);return;}
- const btn=$("downloadZipBtn");btn.disabled=true;btn.textContent="Generando ZIP…";
- try{const zip=new JSZip(),stage=$("pdfStage");for(let i=0;i<list.length;i++){const reg=list[i],root=ticketDocument(reg);stage.innerHTML="";stage.appendChild(root);await waitForTicketImages(root);const pdf=await pdfWorker(root,1.6).toPdf().get("pdf");const blob=pdf.output("blob");const safe=(reg.attendee.full_name||"entrada").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);zip.file(`${String(i+1).padStart(3,"0")}-${safe}.pdf`,blob);$("ticketMessage").textContent=`Generando entradas: ${i+1}/${list.length}`;}
-  stage.innerHTML="";const blob=await zip.generateAsync({type:"blob"});const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="espacio-acredita-entradas.zip";link.click();URL.revokeObjectURL(url);say("ticketMessage",`ZIP generado con ${list.length} entradas.`);
- }catch(e){$("pdfStage").innerHTML="";say("ticketMessage",e.message,true);}finally{btn.disabled=false;btn.textContent="Descargar todas las entradas (ZIP)";}
+ const aid=val("ticketActivity");
+ const list=registrations.filter(reg=>reg.activity_id===aid&&reg.status!=="cancelled");
+ await downloadTicketZip(list,"actividad",$("downloadZipBtn"));
+}
+async function downloadSelectedTicketsZip(){
+ const list=[...selectedRegistrationIds].map(selectedRegistration).filter(reg=>reg&&reg.status!=="cancelled");
+ await downloadTicketZip(list,"seleccionadas",$("downloadSelectedTicketsBtn"));
 }
 function parseQr(decoded){const raw=String(decoded||"").trim();const prefixes=["ESPACIO-ACREDITA:","EA:"];for(const p of prefixes)if(raw.startsWith(p))return raw.slice(p.length);return raw;}
 async function checkin(token){
@@ -567,7 +662,7 @@ async function afterLogin(){
   else say("loginMessage",message,true);
   await supabase.auth.signOut();currentUser=null;currentProfile=null;setSignedIn(false);return;
  }
- currentProfile=data;setSignedIn(true);
+ currentProfile=data;ticketSettings=loadTicketSettings();updateTicketDesignControls();setSignedIn(true);
  if(isSuperadmin){await initSuperadmin(supabase,currentUser);switchTab("superadmin");return;}
  await loadAll();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
 }
@@ -585,7 +680,7 @@ $("registrationsTable").addEventListener("change",ev=>{
   renderRegistrations();
 });
 $("deleteSelectedBtn").addEventListener("click",deleteSelectedRegistrations);
-$("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("exportRegistrationsBtn").addEventListener("click",()=>downloadRegistrationCsv("registered"));$("exportAccreditedBtn").addEventListener("click",()=>downloadRegistrationCsv("accredited"));$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
+$("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("downloadSelectedTicketsBtn").addEventListener("click",downloadSelectedTicketsZip);$("exportRegistrationsBtn").addEventListener("click",()=>downloadRegistrationCsv("registered"));$("exportAccreditedBtn").addEventListener("click",()=>downloadRegistrationCsv("accredited"));$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("ticketTemplate").addEventListener("change",selectTicketTemplate);$("ticketBackground").addEventListener("input",changeTicketColors);$("ticketAccent").addEventListener("input",changeTicketColors);$("ticketTextColor").addEventListener("input",changeTicketColors);$("ticketResetDesignBtn").addEventListener("click",resetTicketDesignColors);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
 $("manualCheckinForm").addEventListener("submit",ev=>{ev.preventDefault();checkin(val("manualToken"));});$("startScannerBtn").addEventListener("click",startScanner);$("stopScannerBtn").addEventListener("click",stopScanner);
 document.addEventListener("click",ev=>{
  const t=ev.target.closest("[data-tab],[data-goto],[data-edit-activity],[data-toggle-activity],[data-ticket],[data-cancel],[data-delete],[data-save-role],[data-manual-accredit]");

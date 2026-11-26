@@ -31,3 +31,44 @@
 .ticket .seat{font-variant:small-caps;font-size:clamp(14px,1.6cqw,27px);line-height:1.35;margin:.6cqw 0}
 .ticket .qr-image{width:63%;max-width:180px;height:auto;aspect-ratio:1;border:4px solid #35105c;border-radius:20px;padding:4px;background:#fff;object-fit:contain;flex:none;margin:.6cqw 0}
 #pdfStage .ticket{width:297mm;height:96.0795mm;max-width:none;aspect-ratio:auto;box-shadow:none}
+
+
+/* Entradas configurables: plantilla clásica y nueva plantilla vertical */
+.ticket{background:linear-gradient(105deg,#5c7e9c 0%,var(--ticket-background,#3c7894) 24%,#4ab7ad 56%,#3c9b9d 100%);color:var(--ticket-text,#fffdf8)}
+.ticket .event-name{color:var(--ticket-accent,#35105c)}
+.ticket .qr-image{border-color:var(--ticket-accent,#35105c)}
+.ticket-preview-frame.ticket-preview-vertical{width:min(100%,90mm);aspect-ratio:90/150}
+.ticket--vertical{width:90mm;height:150mm;background:var(--ticket-background,#190b28);color:var(--ticket-text,#f8f4fb);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;border-radius:0}
+.ticket--vertical:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,#ffffff18,transparent 42%),linear-gradient(155deg,transparent 55%,#ffffff0b);z-index:-1}
+.ticket--vertical:after{display:none}
+.ticket--vertical .vertical-header{position:absolute;left:7mm;right:7mm;top:7mm;height:14mm;display:flex;align-items:center;justify-content:space-between;gap:4mm}
+.ticket--vertical .vertical-brand{display:flex;flex-direction:column;gap:1mm;letter-spacing:.12em;font-size:9px}
+.ticket--vertical .vertical-brand strong{font-size:13px;letter-spacing:.08em}
+.ticket--vertical .vertical-brand span{font-size:7px;opacity:.72}
+.ticket--vertical .vertical-logo{display:flex;align-items:center;gap:2mm;max-width:38mm}
+.ticket--vertical .asset-slot{position:relative;left:auto;top:auto;width:10mm;height:11mm;flex:none;border:1px solid #ffffff35;border-radius:2mm;padding:1mm}
+.ticket--vertical .asset-slot .placeholder{font-size:5px;overflow:hidden}
+.ticket--vertical .vertical-event{position:absolute;left:7mm;right:7mm;top:26mm;height:31mm;display:flex;flex-direction:column;justify-content:center}
+.ticket--vertical .vertical-eyebrow{font-size:7px;letter-spacing:.2em;font-weight:800;color:var(--ticket-accent,#83b6d0);margin:0 0 2mm}
+.ticket--vertical .event-name{font-size:19px;line-height:1.08;font-weight:800;letter-spacing:-.025em;margin:0 0 2mm;color:var(--ticket-text,#f8f4fb);text-transform:none;overflow-wrap:anywhere}
+.ticket--vertical .event-desc{font-size:8px;line-height:1.3;opacity:.75;max-height:10mm;overflow:hidden;white-space:normal}
+.ticket--vertical .vertical-rule{position:absolute;left:7mm;right:7mm;top:59mm;border-top:1px solid #ffffff35}
+.ticket--vertical .vertical-person{position:absolute;left:7mm;right:7mm;top:64mm;height:20mm;display:flex;flex-direction:column;justify-content:center;gap:1mm}
+.ticket--vertical .vertical-person>span:first-child{font-size:7px;letter-spacing:.15em;opacity:.72}
+.ticket--vertical .person{font-family:inherit;font-size:15px;line-height:1.1;font-weight:800;color:var(--ticket-text,#f8f4fb);overflow-wrap:anywhere}
+.ticket--vertical .org{font-size:8px;line-height:1.2;color:var(--ticket-text,#f8f4fb);opacity:.72;margin:0}
+.ticket--vertical .vertical-details{position:absolute;left:7mm;right:7mm;top:89mm;height:16mm;display:grid;grid-template-columns:1fr 1fr;gap:2mm 4mm}
+.ticket--vertical .vertical-detail{min-width:0;display:flex;flex-direction:column;gap:1mm}
+.ticket--vertical .vertical-detail span{font-size:6px;letter-spacing:.14em;opacity:.68}
+.ticket--vertical .vertical-detail strong{font-size:9px;line-height:1.1;overflow-wrap:anywhere}
+.ticket--vertical .vertical-bottom{position:absolute;left:7mm;right:7mm;top:111mm;height:33mm;border-top:1px solid #ffffff35;padding-top:3mm;display:flex;align-items:center;justify-content:space-between;gap:3mm}
+.ticket--vertical .vertical-seat{display:flex;flex-direction:column;gap:2mm;min-width:0}
+.ticket--vertical .admit{font-size:8px;letter-spacing:.12em;margin:0;color:var(--ticket-accent,#83b6d0)}
+.ticket--vertical .seat{font-size:8px;line-height:1.5;margin:0;text-align:left}
+.ticket--vertical .vertical-qr{display:flex;align-items:center;gap:2mm}
+.ticket--vertical .qr-image{width:27mm;max-width:none;height:27mm;border:2px solid var(--ticket-accent,#83b6d0);border-radius:3mm;padding:1mm;margin:0}
+.ticket--vertical .vertical-qr-label{max-width:14mm;font-size:6px;line-height:1.3;letter-spacing:.08em;opacity:.75}
+.ticket--vertical .left-rail,.ticket--vertical .ticket-main,.ticket--vertical .event-meta,.ticket--vertical .event-meta-shadow,.ticket--vertical .stub{display:none}
+#pdfStage .ticket--vertical{width:90mm;height:150mm;max-width:none;aspect-ratio:auto;box-shadow:none}
+.ticket-design-controls input[type="color"]{height:42px;min-height:42px;padding:4px;cursor:pointer}
+.ticket-design-controls .form-actions{align-self:end}
