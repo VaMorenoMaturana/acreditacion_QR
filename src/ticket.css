@@ -39,7 +39,7 @@
 .ticket .qr-image{border-color:var(--ticket-accent,#35105c)}
 .ticket-preview-frame.ticket-preview-vertical{width:min(100%,90mm);aspect-ratio:90/150}
 .ticket--vertical{width:90mm;height:150mm;background:var(--ticket-background,#190b28);color:var(--ticket-text,#f8f4fb);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;border-radius:0}
-.ticket--vertical:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,color-mix(in srgb,var(--ticket-accent,#83b6d0) 32%,transparent),transparent 42%),linear-gradient(155deg,transparent 55%,#ffffff0b);z-index:-1}
+.ticket--vertical:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,#ffffff18,transparent 42%),linear-gradient(155deg,transparent 55%,#ffffff0b);z-index:-1}
 .ticket--vertical:after{display:none}
 .ticket--vertical .vertical-header{position:absolute;left:7mm;right:7mm;top:7mm;height:14mm;display:flex;align-items:center;justify-content:space-between;gap:4mm}
 .ticket--vertical .vertical-brand{display:flex;flex-direction:column;gap:1mm;letter-spacing:.12em;font-size:9px}
