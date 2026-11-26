@@ -45,20 +45,52 @@ function ticketDateLabel(value){
  return `${date.getUTCDate()} de ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
 }
 function ticketTime(value){return value?value.slice(0,5):"";}
+async function fetchAllPages(tableName, columns, orderColumn, ascending=false){
+  const all=[];let from=0;const pageSize=1000;
+  while(true){
+    const {data,error}=await supabase.from(tableName).select(columns)
+      .order(orderColumn,{ascending}).range(from,from+pageSize-1);
+    if(error)return {data:null,error};
+    const page=data||[];all.push(...page);
+    if(page.length<pageSize)break;
+    from+=pageSize;
+  }
+  return {data:all,error:null};
+}
 async function loadAll(){
   const volunteer=currentProfile?.role==="volunteer";
   const activityFields=volunteer?"id,name,event_date,status":"*";
   const registrationFields=volunteer
-    ?"id,activity_id,attendee_id,seat_row,seat_number,status,created_at,attendees(full_name,email,organization)"
-    :"*, attendees(*)";
+    ?"id,activity_id,attendee_id,seat_row,seat_number,status,created_at,attendees!registrations_attendee_organization_fk(full_name,email,organization)"
+    :"*, attendees!registrations_attendee_organization_fk(*)";
   const [a,r,c,p]=await Promise.all([
     supabase.from("activities").select(activityFields).order("event_date",{ascending:false}),
-    supabase.from("registrations").select(registrationFields).order("created_at",{ascending:false}),
-    supabase.from("check_ins").select("id,registration_id,activity_id,checked_in_at").order("checked_in_at",{ascending:false}).limit(100),
+    fetchAllPages("registrations",registrationFields,"created_at",false),
+    fetchAllPages("check_ins","id,registration_id,activity_id,checked_in_at","checked_in_at",false),
     supabase.from("profiles").select("id,email,role,created_at").order("created_at",{ascending:true})
   ]);
-  for(const [name,res] of [["actividades",a],["inscripciones",r],["acreditaciones",c],["perfiles",p]]) if(res.error) console.warn(`Carga de ${name}:`,res.error.message);
-  activities=a.data||[];registrations=(r.data||[]).map(x=>({...x,attendee:x.attendees||{}}));const validRegistrationIds=new Set(registrations.map(x=>x.id));for(const id of selectedRegistrationIds)if(!validRegistrationIds.has(id))selectedRegistrationIds.delete(id);checkins=c.data||[];
+  for(const [name,res] of [["actividades",a],["inscripciones",r],["acreditaciones",c],["perfiles",p]]) {
+    if(res.error)console.warn(`Carga de ${name}:`,res.error.message);
+  }
+  activities=a.error?(activities):(a.data||[]);
+  if(r.error){
+    const registrationError=`No se pudieron cargar las inscripciones: ${r.error.message}. Los datos no se han eliminado; revise la relación y los permisos de Supabase.`;
+    say("registrationLoadError",registrationError,true);
+  }else{
+    say("registrationLoadError","");
+    registrations=(r.data||[]).map(x=>({...x,attendee:x.attendees||{}}));
+    const validRegistrationIds=new Set(registrations.map(x=>x.id));
+    for(const id of selectedRegistrationIds)if(!validRegistrationIds.has(id))selectedRegistrationIds.delete(id);
+  }
+  if(c.error){
+    say("checkinLoadError",`No se pudo cargar el historial de acreditaciones: ${c.error.message}.`,true);
+  }else{
+    say("checkinLoadError",r.error?"No se pudo cargar el listado de inscritos; por eso la acreditación manual puede estar incompleta.":"");
+    checkins=c.data||[];
+  }
+  if(r.error && volunteer){
+    say("checkinLoadError",`No se pudieron cargar los inscritos para acreditar: ${r.error.message}.`,true);
+  }
   activityOptions("registrationActivity");activityOptions("csvActivity");activityOptions("registrationFilter",true);activityOptions("ticketActivity");activityOptions("checkinActivity");
   renderAll();renderUsers(p.data||[]);
 }
@@ -77,12 +109,55 @@ function visibleRegistrations(){
   const filter=$("registrationFilter").value;
   return registrations.filter(r=>!filter||r.activity_id===filter);
 }
+function csvField(value){
+  return '"' + String(value ?? "").replace(/"/g,'""') + '"';
+}
+function updateExportButtons(list=visibleRegistrations()){
+  const active=list.filter(reg=>reg.status!=="cancelled");
+  const accredited=active.filter(reg=>reg.status==="checked_in");
+  $("exportRegistrationsBtn").disabled=active.length===0;
+  $("exportAccreditedBtn").disabled=accredited.length===0;
+  $("exportRegistrationsBtn").textContent=`Exportar inscritos (${active.length})`;
+  $("exportAccreditedBtn").textContent=`Exportar acreditados (${accredited.length})`;
+}
+function downloadRegistrationCsv(kind){
+  const selected=visibleRegistrations().filter(reg=>reg.status!=="cancelled");
+  const rows=kind==="accredited"?selected.filter(reg=>reg.status==="checked_in"):selected;
+  if(!rows.length){
+    say("exportMessage",kind==="accredited"?"No hay acreditaciones para exportar con este filtro.":"No hay inscritos para exportar con este filtro.",true);
+    return;
+  }
+  const checkinByRegistration=new Map(checkins.map(item=>[item.registration_id,item]));
+  const header=["Nombre completo","Correo electrónico","Organización","Actividad","Fecha del evento","Lugar","Fila","Asiento","Estado","Fecha de acreditación","Fecha de inscripción"];
+  const body=rows.map(reg=>{
+    const activity=selectedActivity(reg.activity_id)||{};
+    const checkin=checkinByRegistration.get(reg.id);
+    return [
+      reg.attendee?.full_name,reg.attendee?.email,reg.attendee?.organization,
+      activity.name,activity.event_date,activity.place,reg.seat_row,reg.seat_number,
+      reg.status==="checked_in"?"Acreditada":"Pendiente",
+      checkin?.checked_in_at?new Date(checkin.checked_in_at).toLocaleString("es-CL"):"",
+      reg.created_at?new Date(reg.created_at).toLocaleString("es-CL"):""
+    ].map(csvField).join(";");
+  });
+  const csv="\uFEFF"+[header.map(csvField).join(";"),...body].join("\r\n");
+  const filter=val("registrationFilter");
+  const eventName=filter?(selectedActivity(filter)?.name||"actividad"):"todas-las-actividades";
+  const safeName=eventName.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  const fileName=`${kind==="accredited"?"acreditados":"inscritos"}-${safeName||"eventos"}-${new Date().toISOString().slice(0,10)}.csv`;
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement("a");link.href=url;link.download=fileName;
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  say("exportMessage",`Archivo ${fileName} generado con ${rows.length} registro(s).`);
+}
 function updateBulkSelectionUI(list=visibleRegistrations()){
   const ids=list.map(r=>r.id),selected=ids.filter(id=>selectedRegistrationIds.has(id)).length;
   $("selectionSummary").textContent=`${selectedRegistrationIds.size} seleccionados · ${list.length} visibles`;
   $("deleteSelectedBtn").disabled=selectedRegistrationIds.size===0;
   $("deleteSelectedBtn").textContent=selectedRegistrationIds.size?`Eliminar seleccionados (${selectedRegistrationIds.size})`:"Eliminar seleccionados";
   $("deleteAllVisibleBtn").disabled=list.length===0;
+  updateExportButtons(list);
   $("selectAllRegistrations").checked=ids.length>0&&selected===ids.length;
   $("selectAllRegistrations").indeterminate=selected>0&&selected<ids.length;
 }
@@ -510,7 +585,7 @@ $("registrationsTable").addEventListener("change",ev=>{
   renderRegistrations();
 });
 $("deleteSelectedBtn").addEventListener("click",deleteSelectedRegistrations);
-$("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
+$("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("exportRegistrationsBtn").addEventListener("click",()=>downloadRegistrationCsv("registered"));$("exportAccreditedBtn").addEventListener("click",()=>downloadRegistrationCsv("accredited"));$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
 $("manualCheckinForm").addEventListener("submit",ev=>{ev.preventDefault();checkin(val("manualToken"));});$("startScannerBtn").addEventListener("click",startScanner);$("stopScannerBtn").addEventListener("click",stopScanner);
 document.addEventListener("click",ev=>{
  const t=ev.target.closest("[data-tab],[data-goto],[data-edit-activity],[data-toggle-activity],[data-ticket],[data-cancel],[data-delete],[data-save-role],[data-manual-accredit]");
