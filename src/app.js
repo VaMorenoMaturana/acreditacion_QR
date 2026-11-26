@@ -74,7 +74,8 @@ async function loadAll(){
   }
   activities=a.error?(activities):(a.data||[]);
   if(r.error){
-    say("registrationLoadError",`No se pudieron cargar las inscripciones: ${r.error.message}. Los datos no se han eliminado; revise la relación y los permisos de Supabase.`,true);
+    const registrationError=`No se pudieron cargar las inscripciones: ${r.error.message}. Los datos no se han eliminado; revise la relación y los permisos de Supabase.`;
+    say("registrationLoadError",registrationError,true);
   }else{
     say("registrationLoadError","");
     registrations=(r.data||[]).map(x=>({...x,attendee:x.attendees||{}}));
@@ -84,8 +85,11 @@ async function loadAll(){
   if(c.error){
     say("checkinLoadError",`No se pudo cargar el historial de acreditaciones: ${c.error.message}.`,true);
   }else{
-    say("checkinLoadError","");
+    say("checkinLoadError",r.error?"No se pudo cargar el listado de inscritos; por eso la acreditación manual puede estar incompleta.":"");
     checkins=c.data||[];
+  }
+  if(r.error && volunteer){
+    say("checkinLoadError",`No se pudieron cargar los inscritos para acreditar: ${r.error.message}.`,true);
   }
   activityOptions("registrationActivity");activityOptions("csvActivity");activityOptions("registrationFilter",true);activityOptions("ticketActivity");activityOptions("checkinActivity");
   renderAll();renderUsers(p.data||[]);
@@ -144,7 +148,7 @@ function downloadRegistrationCsv(kind){
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
   const url=URL.createObjectURL(blob);
   const link=document.createElement("a");link.href=url;link.download=fileName;
-  document.body.append(link);link.click();link.remove();URL.revokeObjectURL(url);
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   say("exportMessage",`Archivo ${fileName} generado con ${rows.length} registro(s).`);
 }
 function updateBulkSelectionUI(list=visibleRegistrations()){
