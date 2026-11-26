@@ -436,7 +436,7 @@ async function downloadPdf(reg,design=ticketSettings){
  stage.innerHTML="";stage.appendChild(root);
  try{
   await waitForTicketImages(root);
-  const name=(reg.attendee.full_name||"entrada").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);
+  const name=(reg.attendee.full_name||"entrada").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);
   await pdfWorker(root).set({filename:`entrada-${name}.pdf`}).save();
  }finally{stage.innerHTML="";}
 }
@@ -458,7 +458,7 @@ async function downloadTicketZip(list,downloadName,button){
    stage.innerHTML="";stage.appendChild(root);
    await waitForTicketImages(root);
    const pdf=await pdfWorker(root,1.6).toPdf().get("pdf");
-   const safe=(reg.attendee.full_name||"entrada").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);
+   const safe=(reg.attendee.full_name||"entrada").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,45);
    zip.file(`${String(i+1).padStart(3,"0")}-${safe}.pdf`,pdf.output("blob"));
    $("ticketMessage").textContent=`Generando entradas: ${i+1}/${valid.length}…`;
   }
