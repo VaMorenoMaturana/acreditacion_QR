@@ -115,6 +115,12 @@
     </div>
     <div class="panel"><h2>Personas inscritas</h2>
 <div class="form-grid"><label class="span-2">Filtrar por actividad<select id="registrationFilter"></select></label></div>
+<div class="form-actions export-actions">
+  <button id="exportRegistrationsBtn" class="secondary" type="button" disabled>Exportar inscritos</button>
+  <button id="exportAccreditedBtn" class="primary" type="button" disabled>Exportar acreditados</button>
+</div>
+<p id="exportMessage" class="message" role="status"></p>
+<p id="registrationLoadError" class="message error-message" role="alert"></p>
 <div class="bulk-toolbar"><label class="select-all-label"><input id="selectAllRegistrations" type="checkbox"> Seleccionar todos los inscritos visibles</label><span id="selectionSummary" class="muted">0 seleccionados</span></div>
 <div id="registrationsTable" class="table-wrap"></div>
 <div class="bulk-actions"><div><strong>Acciones masivas</strong><p id="bulkDeleteMessage" class="message" role="status">Seleccione uno o más inscritos para eliminarlos conjuntamente.</p></div>
@@ -150,7 +156,7 @@
       <p id="manualCheckinCount" class="muted">Seleccione una actividad para ver sus inscritos.</p>
       <div id="manualCheckinList" class="table-wrap"></div>
     </div>
-    <div class="panel"><h2>Últimas acreditaciones</h2><div id="checkinTable" class="table-wrap"></div></div>
+    <div class="panel"><h2>Últimas acreditaciones</h2><p id="checkinLoadError" class="message error-message" role="alert"></p><div id="checkinTable" class="table-wrap"></div></div>
   </section>
   <section id="tab-admin" class="tab-panel hidden">
     <div class="page-head"><div><h1>Administración</h1><p class="muted">Gestión de usuarios y roles. Solo administradores.</p></div></div>
