@@ -205,6 +205,8 @@
                 <label>Fondo<select id="ticketBackgroundType"><option value="solid">Color único</option><option value="gradient">Degradado</option></select></label>
                 <label>Patrón<select id="ticketPattern"><option value="none">Sin diseño</option><option value="grid">Cuadrícula</option><option value="dots">Puntos</option><option value="diagonal">Líneas diagonales</option></select></label>
                 <label>Color principal<input id="ticketCanvasColor1" type="color"></label>
+                <label class="span-2">Imagen de fondo (PNG, JPG o WebP, hasta 700 KB)<input id="ticketBackgroundImageUpload" type="file" accept="image/png,image/jpeg,image/webp"></label>
+                <div class="form-actions span-2"><button id="ticketBackgroundImageRemoveBtn" type="button" class="secondary">Quitar imagen de fondo</button></div>
                 <label id="ticketGradientColorLabel">Color secundario<input id="ticketCanvasColor2" type="color"></label>
                 <label>Ángulo degradado (°)<input id="ticketGradientAngle" type="number" min="0" max="360"></label>
                 <label>Forma<select id="ticketCornerStyle"><option value="square">Rectangular</option><option value="rounded">Esquinas redondeadas</option><option value="ticket">Borde recortado</option></select></label>
