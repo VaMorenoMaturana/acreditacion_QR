@@ -57,7 +57,7 @@ El tamaño de página del PDF se adapta a las dimensiones físicas configuradas.
 ## Notas de uso
 
 1. Seleccione una plantilla guardada o uno de los dos formatos integrados.
-2. Para crear una plantilla propia, abra el editor y seleccione **Nueva**.
+2. Para crear una plantilla propia, abra el editor y seleccione **Nueva**. También puede abrir una plantilla existente y elegir **Guardar como copia** para crear una variante sin sobrescribir el original.
 3. Añada y organice los elementos en el lienzo.
 4. Revise la vista previa con una inscripción real seleccionada.
 5. Guarde la plantilla. Quedará disponible para el resto de usuarios de la organización.
