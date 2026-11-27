@@ -26,11 +26,14 @@ create table if not exists public.mail_delivery_logs (
   sent_by uuid references auth.users(id) on delete set null,
   recipient_email text not null,
   subject text not null,
-  status text not null check (status in ('sent', 'failed')),
+  status text not null check (status in ('sending', 'sent', 'failed')),
   provider_message_id text,
   error_message text,
   created_at timestamptz not null default now()
 );
+
+create unique index if not exists mail_delivery_logs_one_active_send_per_registration_idx
+  on public.mail_delivery_logs (registration_id) where status = 'sending';
 
 create index if not exists mail_delivery_logs_org_activity_created_idx
   on public.mail_delivery_logs (organization_id, activity_id, created_at desc);
