@@ -100,7 +100,6 @@ function selectTicketTemplate(){
   ticketSettings.customDesign=normalizeTicketDesign(template.design);ticketSettings.customTemplateName=template.name;
  }
  saveTicketSettings();updateTicketDesignControls();renderTicketPreview();
- if(ticketSettings.template==="custom")openTicketEditor();
 }
 function changeTicketColors(){
  const colors=ticketSettings.colors[ticketSettings.template];
