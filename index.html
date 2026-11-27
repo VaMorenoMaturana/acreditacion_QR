@@ -65,6 +65,7 @@
     <button data-tab="activities">Actividades</button>
     <button data-tab="registrations">Inscripciones</button>
     <button data-tab="tickets">Entradas PDF/ZIP</button>
+    <button data-tab="mail" id="mailTab"><span class="mail-status-dot disconnected" aria-hidden="true"></span> Envío por correo</button>
     <button data-tab="checkin">Acreditación QR</button>
     <button data-goto="auditorio">Asignación de asientos</button>
     <button data-tab="admin" id="adminTab">Administración</button>
@@ -144,6 +145,32 @@
     </div>
     <div class="panel"><h2>Vista previa</h2><div id="ticketPreview" class="ticket-preview"></div></div>
   </section>
+  <section id="tab-mail" class="tab-panel hidden">
+    <div class="page-head"><div><h1>Envío de entradas por correo</h1><p class="muted">Cada participante recibirá un correo individual con su entrada PDF y su propio código QR.</p></div></div>
+    <div class="panel mail-status-panel">
+      <div><strong>Estado del servicio de correo</strong><p class="muted">El estado se verifica contra el servidor SMTP configurado por su organización.</p></div>
+      <div class="mail-status-indicator"><span class="mail-status-dot disconnected" aria-hidden="true"></span><strong class="mail-status-text">Sin verificar</strong></div>
+    </div>
+    <div class="panel"><h2>Preparar envío</h2>
+      <div class="form-grid">
+        <label class="span-2">Actividad<select id="mailActivity"></select></label>
+        <label class="span-2">Asunto del correo *<input id="mailSubject" maxlength="180" required value="Su entrada para {{evento}}" placeholder="Su entrada para {{evento}}"></label>
+        <label class="span-2">Texto descriptivo *<textarea id="mailBody" rows="6" maxlength="8000" required placeholder="Escriba el mensaje que acompañará la entrada."></textarea></label>
+      </div>
+      <p class="muted">Variables disponibles: <code>{{nombre}}</code>, <code>{{evento}}</code>, <code>{{fecha}}</code> y <code>{{lugar}}</code>. Se reemplazarán por los datos de cada persona y de su actividad.</p>
+      <label class="mail-checkbox"><input id="mailResendSent" type="checkbox"> Incluir también personas que ya recibieron una entrada anteriormente</label>
+    </div>
+    <div class="panel">
+      <div class="page-head"><div><h2>Destinatarios</h2><p id="mailRecipientSummary" class="muted">Seleccione una actividad.</p></div></div>
+      <div id="mailRecipientsTable" class="table-wrap"><p class="muted">Seleccione una actividad para revisar los destinatarios.</p></div>
+      <div class="form-actions"><button id="mailSendBtn" class="primary" type="button" disabled>Enviar entradas individuales</button></div>
+      <p id="mailProgressMessage" class="message" role="status"></p><div id="mailResults" class="mail-results" aria-live="polite"></div>
+    </div>
+    <div class="panel"><h2>Antes de enviar</h2>
+      <p class="muted">El sistema incluye a los inscritos vigentes que tengan un correo válido. Las personas sin correo se omiten. Por defecto, no se vuelve a enviar a quienes ya figuran como enviados para esa actividad. Cada mensaje se envía por separado; no se utiliza copia oculta (CCO) ni se comparte la lista de destinatarios.</p>
+      <p class="muted">El PDF adjunto utiliza el formato y los colores seleccionados en «Entradas PDF/ZIP». Revise esa vista previa antes de iniciar un envío masivo.</p>
+    </div>
+  </section>
   <section id="tab-checkin" class="tab-panel hidden">
     <div class="page-head"><div><h1>Acreditación QR</h1><p class="muted">Acredite participantes escaneando su entrada o buscándolos en el listado.</p></div></div>
     <div class="panel"><label>Actividad<select id="checkinActivity"></select></label></div>
@@ -185,6 +212,34 @@
     </div>
     <div class="panel"><h2>Usuarios registrados</h2><p class="muted">Cambie el rol de acceso de las cuentas existentes desde esta tabla.</p><div id="usersTable" class="table-wrap"></div></div>
     <div class="panel"><h2>Notas de seguridad</h2><ul><li>La creación de cuentas se ejecuta en una función segura de Supabase; la clave privilegiada nunca se expone en el navegador.</li><li>Las cuentas se crean con correo y contraseña asignados por un administrador; no se envían invitaciones.</li><li>Asigne el rol de administrador solo a personas que realmente deban gestionar usuarios y permisos.</li><li>Active MFA en las cuentas administrativas cuando esté disponible para su proyecto.</li></ul></div>
+    <div class="panel"><h2>Configuración de correo SMTP</h2>
+      <p class="muted">La configuración pertenece exclusivamente a su organización. La contraseña SMTP se cifra en el servidor y nunca vuelve a mostrarse en el navegador.</p>
+      <form id="mailSettingsForm" class="form-grid">
+        <label class="span-2">Servidor SMTP (host) *<input id="mailSmtpHost" required maxlength="253" placeholder="email-smtp.us-east-1.amazonaws.com"></label>
+        <label>Puerto SMTP *<input id="mailSmtpPort" type="number" min="1" max="65535" value="2587" required></label>
+        <label>Seguridad de conexión<select id="mailSmtpSecurity"><option value="starttls">STARTTLS (recomendado)</option><option value="tls">TLS directo</option></select></label>
+        <label>Usuario SMTP *<input id="mailSmtpUsername" required maxlength="254" autocomplete="username"></label>
+        <label>Contraseña SMTP *<input id="mailSmtpPassword" type="password" maxlength="512" autocomplete="new-password" placeholder="Ingrese la contraseña SMTP"></label>
+        <label>Correo remitente *<input id="mailSenderEmail" type="email" required maxlength="254" placeholder="entradas@su-dominio.cl"></label>
+        <label>Nombre del remitente *<input id="mailSenderName" required maxlength="120" value="Espacio Acredita"></label>
+        <div class="form-actions span-2"><button id="mailSaveSettingsBtn" class="primary" type="submit">Guardar configuración SMTP</button><button id="mailTestConnectionBtn" class="secondary" type="button">Probar conexión</button></div>
+      </form>
+      <p id="mailSettingsMessage" class="message" role="status"></p>
+      <div class="mail-tutorial">
+        <h3>Guía para configurar el correo</h3>
+        <ol>
+          <li>Habilite un proveedor de correo transaccional que permita enviar mensajes desde una aplicación.</li>
+          <li>En el panel del proveedor busque servidor SMTP (host), puerto, usuario y contraseña o clave SMTP.</li>
+          <li>Registre y verifique el dominio o la dirección remitente. El proveedor debe autorizar el remitente configurado aquí.</li>
+          <li>Copie los datos en este formulario. Para la mayoría de los proveedores, seleccione STARTTLS.</li>
+          <li>Guarde y presione «Probar conexión». El estado verde indica que el servidor aceptó la conexión y autenticación.</li>
+        </ol>
+        <p><strong>Importante sobre los puertos:</strong> Supabase restringe conexiones SMTP salientes por los puertos 25, 465 y 587. Solicite a su proveedor un puerto alternativo habilitado; suelen utilizarse 2587 o 2525. El puerto debe estar expresamente admitido por el proveedor.</p>
+        <p>Ejemplo orientativo: AWS SES ofrece el puerto 2587 con STARTTLS. Utilice los datos propios de su cuenta y región.</p>
+        <p>Si el proveedor solo ofrece SMTP en los puertos restringidos, esta conexión directa no funcionará desde Supabase; utilice un proveedor con puerto alternativo o una integración de envío mediante API.</p>
+        <p><strong>Clave de cifrado:</strong> agregue una clave aleatoria Base64 de 32 bytes llamada <code>MAIL_SETTINGS_ENCRYPTION_KEY</code> en Supabase → Edge Functions → Secrets. Esta clave cifra las contraseñas SMTP guardadas por cada organización; no es la contraseña SMTP del remitente.</p>
+      </div>
+    </div>
   </section>
 
   <section id="tab-superadmin" class="tab-panel hidden">
