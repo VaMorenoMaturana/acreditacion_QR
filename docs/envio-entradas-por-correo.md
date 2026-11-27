@@ -23,7 +23,7 @@ La acción «Probar conexión» utiliza la verificación SMTP de Nodemailer y co
 
 ## Restricciones de red SMTP
 
-Supabase Edge Functions restringe conexiones SMTP salientes por los puertos 25, 465 y 587. Configure un puerto alternativo que su proveedor admita, habitualmente 2587 o 2525. El ejemplo de Supabase para SMTP recomienda AWS SES con el puerto 2587. El modo STARTTLS es el valor predeterminado para este flujo.
+Supabase Edge Functions restringe conexiones SMTP salientes por los puertos 25 y 587. Configure un puerto alternativo que su proveedor admita, habitualmente 2587 o 2525. El puerto 465 no aparece entre las restricciones documentadas de Supabase y corresponde normalmente a SMTP con TLS directo; confírmelo con su proveedor. El ejemplo de Supabase para SMTP recomienda AWS SES con el puerto 2587. El modo STARTTLS es el valor predeterminado para este flujo.
 
 Si su proveedor solo ofrece los puertos restringidos, esta conexión SMTP directa no funcionará desde Supabase. En ese caso se necesita un proveedor que acepte un puerto alternativo o una integración de envío mediante API.
 
