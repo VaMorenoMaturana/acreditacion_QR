@@ -16,6 +16,7 @@ const TICKET_DEFAULT_COLORS = {
  vertical:{background:"#190b28",accent:"#83b6d0",text:"#f8f4fb"}
 };
 let ticketSettings={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+let mailSettingsMeta=null,mailConnected=false,mailLogsByRegistration=new Map(),mailSending=false,mailLogsReady=false,mailLogsActivityId="";
 const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const say = (id, message, bad=false) => { const el=$(id); if(el){el.textContent=message;el.style.color=bad?"#9b2828":"";} };
 const val = id => $(id).value.trim();
@@ -35,9 +36,10 @@ function setSignedIn(on){
 function applyRoleNavigation(){
  const volunteer=currentProfile?.role==="volunteer";
  const superadmin=currentProfile?.role==="superadmin";
+ const admin=currentProfile?.role==="admin";
  document.querySelectorAll(".tabs [data-tab],.tabs [data-goto]").forEach(button=>{
   if(superadmin) button.classList.toggle("hidden",button.id!=="superadminTab");
-  else button.classList.toggle("hidden",button.id==="superadminTab"||(volunteer&&button.dataset.tab!=="checkin"));
+  else button.classList.toggle("hidden",button.id==="superadminTab"||(button.id==="mailTab"&&!admin)||(volunteer&&button.dataset.tab!=="checkin"));
  });
 }
 function table(headers, rows){if(!rows.length)return '<p class="muted">Sin registros para mostrar.</p>';return `<table><thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;}
@@ -142,7 +144,7 @@ async function loadAll(){
   if(r.error && volunteer){
     say("checkinLoadError",`No se pudieron cargar los inscritos para acreditar: ${r.error.message}.`,true);
   }
-  activityOptions("registrationActivity");activityOptions("csvActivity");activityOptions("registrationFilter",true);activityOptions("ticketActivity");activityOptions("checkinActivity");
+  activityOptions("registrationActivity");activityOptions("csvActivity");activityOptions("registrationFilter",true);activityOptions("ticketActivity");activityOptions("checkinActivity");activityOptions("mailActivity");
   renderAll();renderUsers(p.data||[]);
 }
 function renderAll(){
@@ -481,7 +483,166 @@ async function downloadSelectedTicketsZip(){
  const list=[...selectedRegistrationIds].map(selectedRegistration).filter(reg=>reg&&reg.status!=="cancelled");
  await downloadTicketZip(list,"seleccionadas",$("downloadSelectedTicketsBtn"));
 }
+
+function setMailConnectionStatus(state,message){
+ const type=state==="connected"?"connected":state==="connecting"?"connecting":"disconnected";
+ mailConnected=state==="connected";
+ document.querySelectorAll(".mail-status-dot").forEach(dot=>{dot.className="mail-status-dot "+type;dot.title=message;});
+ document.querySelectorAll(".mail-status-text").forEach(node=>{node.textContent=message;});
+ const button=$("mailSendBtn");
+ if(button)button.disabled=mailSending||!mailConnected||!mailEligibleRecipients().length;
+}
+async function callMailManager(action,payload={}){
+ const response=await supabase.functions.invoke("mail-manager",{body:{action,...payload}});
+ if(response.error){
+  let message=response.error.message||"No fue posible comunicarse con el servicio de correo.";
+  try{const ctx=response.error.context;const details=ctx?.clone?await ctx.clone().json():null;if(details?.error)message=details.error;}catch{}
+  throw new Error(message);
+ }
+ if(response.data?.error)throw new Error(response.data.error);
+ return response.data||{};
+}
+function mailSettingsPayload(){
+ return {settings:{host:val("mailSmtpHost"),port:Number(val("mailSmtpPort")),security:val("mailSmtpSecurity"),username:val("mailSmtpUsername"),senderEmail:val("mailSenderEmail"),senderName:val("mailSenderName")},password:$("mailSmtpPassword").value};
+}
+async function refreshMailConnection(meta=mailSettingsMeta){
+ if(!navigator.onLine){setMailConnectionStatus("disconnected","Sin conexión a internet");return false;}
+ setMailConnectionStatus("connecting","Comprobando conexión SMTP…");
+ try{
+  const settings=meta||(await callMailManager("get_settings")).settings;mailSettingsMeta=settings;
+  if(!settings?.configured||!settings?.hasPassword){setMailConnectionStatus("disconnected","SMTP no configurado");return false;}
+  await callMailManager("test_connection");
+  setMailConnectionStatus("connected","Conectado y listo para enviar");return true;
+ }catch(error){setMailConnectionStatus("disconnected",error.message||"No se pudo conectar al servidor SMTP");return false;}
+}
+async function loadMailSettings(){
+ if(currentProfile?.role!=="admin")return;
+ try{
+  const result=await callMailManager("get_settings"),settings=result.settings;mailSettingsMeta=settings;
+  $("mailSmtpHost").value=settings.host||"";$("mailSmtpPort").value=settings.port||2587;
+  $("mailSmtpSecurity").value=settings.security||"starttls";$("mailSmtpUsername").value=settings.username||"";
+  $("mailSenderEmail").value=settings.senderEmail||"";$("mailSenderName").value=settings.senderName||"";
+  $("mailSmtpPassword").value="";$("mailSmtpPassword").placeholder=settings.hasPassword?"Configurada; deje vacío para conservarla":"Ingrese la contraseña SMTP";
+  await refreshMailConnection(settings);
+ }catch(error){setMailConnectionStatus("disconnected","No se pudo consultar la configuración SMTP");say("mailSettingsMessage",error.message,true);}
+}
+async function testMailConnection(){
+ if(!navigator.onLine){setMailConnectionStatus("disconnected","Sin conexión a internet");return;}
+ setMailConnectionStatus("connecting","Probando credenciales SMTP…");
+ try{await callMailManager("test_connection",mailSettingsPayload());setMailConnectionStatus("connected","Conexión SMTP verificada");say("mailSettingsMessage","Conexión y autenticación SMTP correctas.");}
+ catch(error){setMailConnectionStatus("disconnected",error.message);say("mailSettingsMessage",error.message,true);}
+}
+async function saveMailSettings(ev){
+ ev.preventDefault();const payload=mailSettingsPayload(),button=$("mailSaveSettingsBtn");
+ button.disabled=true;button.textContent="Guardando…";say("mailSettingsMessage","Guardando configuración SMTP de forma cifrada…");
+ try{
+  const result=await callMailManager("save_settings",payload);mailSettingsMeta=result.settings;
+  $("mailSmtpPassword").value="";$("mailSmtpPassword").placeholder="Configurada; deje vacío para conservarla";
+  say("mailSettingsMessage","Configuración guardada. Comprobando conexión…");
+  await refreshMailConnection(result.settings);
+  if(mailConnected)say("mailSettingsMessage","Configuración guardada y conexión verificada.");
+ }catch(error){setMailConnectionStatus("disconnected",error.message);say("mailSettingsMessage",error.message,true);}
+ finally{button.disabled=false;button.textContent="Guardar configuración SMTP";}
+}
+function mailActivityRecipients(){
+ const activityId=val("mailActivity");
+ return registrations.filter(reg=>reg.activity_id===activityId&&reg.status!=="cancelled");
+}
+function mailEligibleRecipients(){
+ if(!mailLogsReady||mailLogsActivityId!==val("mailActivity"))return [];
+ const resend=$("mailResendSent")?.checked===true;
+ return mailActivityRecipients().filter(reg=>{
+  const email=String(reg.attendee?.email||"").trim();
+  const valid=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const previousStatus=mailLogsByRegistration.get(reg.id)?.status;
+  const wasAlreadySent=previousStatus==="sent"||previousStatus==="sending";
+  return valid&&(resend||!wasAlreadySent);
+ });
+}
+function renderMailRecipients(){
+ const activityId=val("mailActivity"),all=mailActivityRecipients();
+ const valid=all.filter(reg=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(reg.attendee?.email||"").trim()));
+ const sent=valid.filter(reg=>mailLogsByRegistration.get(reg.id)?.status==="sent").length;
+ const eligible=mailEligibleRecipients(),missing=all.length-valid.length;
+ $("mailRecipientSummary").textContent=eligible.length+" por enviar · "+sent+" ya enviadas · "+missing+" sin correo válido · "+all.length+" inscritos vigentes";
+ if(!activityId)$("mailRecipientsTable").innerHTML='<p class="muted">Seleccione una actividad para revisar los destinatarios.</p>';
+ else if(!all.length)$("mailRecipientsTable").innerHTML='<p class="muted">Esta actividad no tiene inscritos vigentes.</p>';
+ else{
+  const rows=all.slice(0,100).map(reg=>{
+   const log=mailLogsByRegistration.get(reg.id),email=String(reg.attendee?.email||"").trim();
+   const validEmail=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+   const state=!validEmail?"Sin correo válido":log?.status==="sent"?"Enviada anteriormente":log?.status==="sending"?"Envío en proceso / resultado no confirmado":log?.status==="failed"?"Último intento fallido":"Lista para enviar";
+   return "<tr><td>"+escapeHtml(reg.attendee?.full_name||"Sin nombre")+"</td><td>"+escapeHtml(email||"—")+"</td><td>"+escapeHtml(state)+"</td></tr>";
+  }).join("");
+  $("mailRecipientsTable").innerHTML='<table><thead><tr><th>Participante</th><th>Correo individual</th><th>Estado</th></tr></thead><tbody>'+rows+'</tbody></table>'+(all.length>100?'<p class="muted">Se muestran los primeros 100 inscritos. El envío considera todos los destinatarios válidos.</p>':"");
+ }
+ const button=$("mailSendBtn");button.disabled=mailSending||!mailConnected||eligible.length===0;
+ button.textContent="Enviar entradas individuales ("+eligible.length+")";
+}
+async function loadMailDeliveryLogs(){
+ if(currentProfile?.role!=="admin")return;
+ const activityId=val("mailActivity");mailLogsByRegistration=new Map();mailLogsReady=false;mailLogsActivityId=activityId;
+ if(!activityId){mailLogsReady=true;renderMailRecipients();return;}
+ try{
+  const result=await callMailManager("list_activity_logs",{activity_id:activityId});
+  for(const log of result.logs||[])if(!mailLogsByRegistration.has(log.registration_id))mailLogsByRegistration.set(log.registration_id,log);
+  mailLogsReady=true;
+ }catch(error){say("mailProgressMessage",error.message,true);mailLogsReady=false;}
+ renderMailRecipients();
+}
+async function ticketPdfBlob(reg){
+ const root=ticketDocument(reg,ticketSettings),stage=$("pdfStage");stage.innerHTML="";stage.appendChild(root);
+ try{await waitForTicketImages(root);const pdf=await pdfWorker(root,1.6).toPdf().get("pdf");return pdf.output("blob");}
+ finally{stage.innerHTML="";}
+}
+async function blobToBase64(blob){
+ const bytes=new Uint8Array(await blob.arrayBuffer());let binary="";
+ for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+ return btoa(binary);
+}
+async function sendMailEntries(){
+ if(currentProfile?.role!=="admin")return;
+ if(!mailConnected){say("mailProgressMessage","Primero configure y verifique la conexión SMTP.",true);return;}
+ const activity=selectedActivity(val("mailActivity")),subject=val("mailSubject"),body=val("mailBody"),recipients=mailEligibleRecipients();
+ if(!activity){say("mailProgressMessage","Seleccione una actividad.",true);return;}
+ if(!subject||!body){say("mailProgressMessage","Complete el asunto y el texto descriptivo.",true);return;}
+ if(!recipients.length){say("mailProgressMessage","No hay destinatarios válidos pendientes de envío.",true);return;}
+ if(!confirm("Se enviarán "+recipients.length+" correos individuales para «"+activity.name+"». Cada persona recibirá únicamente su propia entrada PDF. ¿Desea continuar?"))return;
+ const button=$("mailSendBtn");mailSending=true;button.disabled=true;button.textContent="Enviando…";
+ let sent=0,failed=0;const failures=[];
+ try{
+  for(let index=0;index<recipients.length;index++){
+   if(!navigator.onLine){setMailConnectionStatus("disconnected","Sin conexión a internet");failures.push("Se perdió la conexión a internet; el envío se detuvo.");break;}
+   const reg=recipients[index];
+   $("mailProgressMessage").textContent="Preparando entrada y enviando "+(index+1)+" de "+recipients.length+": "+reg.attendee.full_name+"…";
+   try{
+    const pdfBlob=await ticketPdfBlob(reg);
+    if(pdfBlob.size>3*1024*1024)throw new Error("La entrada PDF supera 3 MB.");
+    const attachment=await blobToBase64(pdfBlob);
+    await callMailManager("send_one",{registration_id:reg.id,subject:subject,body:body,attachment_base64:attachment,allow_resend:$("mailResendSent").checked});
+    sent++;mailLogsByRegistration.set(reg.id,{registration_id:reg.id,status:"sent",recipient_email:reg.attendee.email});
+   }catch(error){
+    failed++;failures.push((reg.attendee?.full_name||"Participante")+": "+error.message);
+    if(/connection|connect|timeout|socket|enotfound|econn|tls|authentication|network|fetch/i.test(error.message)){
+     setMailConnectionStatus("disconnected","Conexión SMTP interrumpida durante el envío");
+     failures.push("El servicio de correo se marcó como desconectado y el envío se detuvo.");
+     break;
+    }
+   }
+   $("mailProgressMessage").textContent="Envío en curso: "+(index+1)+"/"+recipients.length+" · "+sent+" enviados · "+failed+" fallidos";
+  }
+ }finally{
+  mailSending=false;renderMailRecipients();button.disabled=!mailConnected||!mailEligibleRecipients().length;
+ }
+ await loadMailDeliveryLogs();
+ const notAttempted=Math.max(0,recipients.length-sent-failed);
+ say("mailProgressMessage","Proceso finalizado: "+sent+" aceptados por SMTP · "+failed+" fallidos · "+notAttempted+" no procesados.",failed>0||notAttempted>0);
+ $("mailResults").innerHTML=failures.length
+  ?"<strong>Detalles para revisar</strong><ul>"+failures.slice(0,20).map(item=>"<li>"+escapeHtml(item)+"</li>").join("")+"</ul>"
+  :"El servidor SMTP aceptó todos los mensajes para su procesamiento. La entrega final depende del proveedor y del servidor de correo del destinatario.";
+}
 function parseQr(decoded){const raw=String(decoded||"").trim();const prefixes=["ESPACIO-ACREDITA:","EA:"];for(const p of prefixes)if(raw.startsWith(p))return raw.slice(p.length);return raw;}
+
 async function checkin(token){
  token=parseQr(token);if(!token){$("checkinResult").className="checkin-result bad";$("checkinResult").textContent="Ingresa o escanea un QR.";return;}
  const aid=val("checkinActivity");
@@ -584,10 +745,12 @@ async function saveRole(id){const role=document.querySelector(`[data-role-user="
 function switchTab(name){
  if(currentProfile?.role==="superadmin")name="superadmin";
  else if(currentProfile?.role==="volunteer")name="checkin";
+ else if(name==="mail"&&currentProfile?.role!=="admin")name="dashboard";
  document.querySelectorAll(".tab-panel").forEach(x=>x.classList.add("hidden"));
  $("tab-"+name)?.classList.remove("hidden");
  document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));
  if(name==="tickets")resizeTicketPreview();
+ if(name==="mail"){void loadMailDeliveryLogs();void refreshMailConnection();}
 }
 $("loginForm").addEventListener("submit",async ev=>{ev.preventDefault();say("loginMessage","Iniciando sesión…");if(!supabase){say("loginMessage","Configura Supabase en src/config.js.",true);return;}const {data,error}=await supabase.auth.signInWithPassword({email:val("loginEmail"),password:$("loginPassword").value});if(error){say("loginMessage",error.message,true);return;}currentUser=data.user;await afterLogin();});
 $("showSignupBtn").addEventListener("click",()=>{
@@ -664,7 +827,7 @@ async function afterLogin(){
  }
  currentProfile=data;ticketSettings=loadTicketSettings();updateTicketDesignControls();setSignedIn(true);
  if(isSuperadmin){await initSuperadmin(supabase,currentUser);switchTab("superadmin");return;}
- await loadAll();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
+ await loadAll();if(currentProfile.role==="admin")void loadMailSettings();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
 }
 $("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("createUserForm").addEventListener("submit",createManagedUser);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
 $("registrationFilter").addEventListener("change",()=>{selectedRegistrationIds.clear();renderRegistrations();say("bulkDeleteMessage","Selección reiniciada al cambiar el filtro.");});
@@ -705,4 +868,11 @@ $("ticketActivity").addEventListener("change",()=>{activityOptions("ticketActivi
 $("checkinActivity").addEventListener("change",renderManualCheckinList);
 $("manualCheckinSearch").addEventListener("input",renderManualCheckinList);
 $("adminTab").addEventListener("click",()=>{if(currentProfile?.role!=="admin")switchTab("dashboard");});
+$("mailSettingsForm").addEventListener("submit",saveMailSettings);
+$("mailTestConnectionBtn").addEventListener("click",testMailConnection);
+$("mailActivity").addEventListener("change",()=>{$("mailProgressMessage").textContent="";$("mailResults").textContent="";void loadMailDeliveryLogs();});
+$("mailResendSent").addEventListener("change",renderMailRecipients);
+$("mailSendBtn").addEventListener("click",sendMailEntries);
+window.addEventListener("offline",()=>setMailConnectionStatus("disconnected","Sin conexión a internet"));
+window.addEventListener("online",()=>{if(currentProfile?.role==="admin")void refreshMailConnection();});
 if(supabase){supabase.auth.getSession().then(async({data})=>{if(data.session){currentUser=data.session.user;await afterLogin();}});supabase.auth.onAuthStateChange((_event,session)=>{if(!session){currentUser=null;currentProfile=null;setSignedIn(false);}});}
