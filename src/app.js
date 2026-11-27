@@ -515,6 +515,7 @@ function openTicketEditor(){
  }
  ticketEditorSelectedId="";
  $("ticketEditorNewBtn").classList.toggle("hidden",!ticketEditorIsAdmin());
+ $("ticketEditorCopyBtn").classList.toggle("hidden",!ticketEditorIsAdmin()||!ticketEditorTemplateId);
  $("ticketEditorSaveBtn").classList.toggle("hidden",!ticketEditorIsAdmin());
  $("ticketEditorDeleteBtn").classList.toggle("hidden",!ticketEditorIsAdmin()||!ticketEditorTemplateId);
  const readOnly=!ticketEditorIsAdmin();
@@ -533,6 +534,14 @@ function newTicketEditorDesign(){
  $("ticketEditorDeleteBtn").classList.add("hidden");
  renderTicketEditorControls();renderTicketEditorStage();renderTicketInspector();
  say("ticketEditorMessage","Nueva plantilla en blanco lista para editar. Puede añadir, mover, redimensionar y eliminar elementos.");
+}
+function copyTicketEditorTemplate(){
+ if(!ticketEditorIsAdmin()||!ticketEditorDesign)return;
+ const currentName=$("ticketEditorName").value.trim()||"Plantilla";
+ ticketEditorTemplateId="";
+ $("ticketEditorName").value=(currentName+" · copia").slice(0,80);
+ $("ticketEditorDeleteBtn").classList.add("hidden");
+ say("ticketEditorMessage","Está editando una copia independiente. Al guardar se creará una nueva plantilla y se conservará la original.");
 }
 function renderTicketEditorControls(){
  if(!ticketEditorDesign)return;
@@ -814,6 +823,7 @@ function bindTicketEditorEvents(){
  $("ticketOpenEditorBtn").addEventListener("click",openTicketEditor);
  $("ticketEditorCloseBtn").addEventListener("click",closeTicketEditor);
  $("ticketEditorNewBtn").addEventListener("click",newTicketEditorDesign);
+ $("ticketEditorCopyBtn").addEventListener("click",copyTicketEditorTemplate);
  $("ticketEditorSaveBtn").addEventListener("click",saveTicketEditorTemplate);
  $("ticketEditorDeleteBtn").addEventListener("click",deleteTicketEditorTemplate);
  $("ticketAddElementBtn").addEventListener("click",addTicketEditorElement);
