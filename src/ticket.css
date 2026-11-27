@@ -87,7 +87,7 @@
 .ticket-editor-stage .ticket-design-item{cursor:move;user-select:none}
 .ticket-editor-stage .ticket-design-item.selected{outline:2px dashed #ffb000;outline-offset:1px;overflow:visible}
 .ticket-editor-stage .ticket-design-item.selected>*{pointer-events:none}
-.ticket-design-resize{position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;border:2px solid #fff;border-radius:3px;background:#35105c;box-shadow:0 1px 4px #0007;cursor:nwse-resize;z-index:9999}
+.ticket-design-resize{position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;border:2px solid #fff;border-radius:3px;background:#35105c;box-shadow:0 1px 4px #0007;cursor:nwse-resize;z-index:9999;pointer-events:auto!important}
 .ticket-editor-addbar{display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:12px 0}
 .ticket-editor-addbar label{min-width:240px;flex:0 1 360px}
 .ticket-editor-addbar .muted{flex:1 1 220px;font-size:11px}
