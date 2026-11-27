@@ -554,8 +554,9 @@ function mailEligibleRecipients(){
  return mailActivityRecipients().filter(reg=>{
   const email=String(reg.attendee?.email||"").trim();
   const valid=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const wasSent=mailLogsByRegistration.get(reg.id)?.status==="sent";
-  return valid&&(resend||!wasSent);
+  const previousStatus=mailLogsByRegistration.get(reg.id)?.status;
+  const wasAlreadySent=previousStatus==="sent"||previousStatus==="sending";
+  return valid&&(resend||!wasAlreadySent);
  });
 }
 function renderMailRecipients(){
@@ -570,7 +571,7 @@ function renderMailRecipients(){
   const rows=all.slice(0,100).map(reg=>{
    const log=mailLogsByRegistration.get(reg.id),email=String(reg.attendee?.email||"").trim();
    const validEmail=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-   const state=!validEmail?"Sin correo válido":log?.status==="sent"?"Enviada anteriormente":log?.status==="failed"?"Último intento fallido":"Lista para enviar";
+   const state=!validEmail?"Sin correo válido":log?.status==="sent"?"Enviada anteriormente":log?.status==="sending"?"Envío en proceso / resultado no confirmado":log?.status==="failed"?"Último intento fallido":"Lista para enviar";
    return "<tr><td>"+escapeHtml(reg.attendee?.full_name||"Sin nombre")+"</td><td>"+escapeHtml(email||"—")+"</td><td>"+escapeHtml(state)+"</td></tr>";
   }).join("");
   $("mailRecipientsTable").innerHTML='<table><thead><tr><th>Participante</th><th>Correo individual</th><th>Estado</th></tr></thead><tbody>'+rows+'</tbody></table>'+(all.length>100?'<p class="muted">Se muestran los primeros 100 inscritos. El envío considera todos los destinatarios válidos.</p>':"");
@@ -618,7 +619,7 @@ async function sendMailEntries(){
     const pdfBlob=await ticketPdfBlob(reg);
     if(pdfBlob.size>3*1024*1024)throw new Error("La entrada PDF supera 3 MB.");
     const attachment=await blobToBase64(pdfBlob);
-    await callMailManager("send_one",{registration_id:reg.id,subject:subject,body:body,attachment_base64:attachment});
+    await callMailManager("send_one",{registration_id:reg.id,subject:subject,body:body,attachment_base64:attachment,allow_resend:$("mailResendSent").checked});
     sent++;mailLogsByRegistration.set(reg.id,{registration_id:reg.id,status:"sent",recipient_email:reg.attendee.email});
    }catch(error){
     failed++;failures.push((reg.attendee?.full_name||"Participante")+": "+error.message);
