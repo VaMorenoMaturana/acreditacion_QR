@@ -234,7 +234,7 @@
           <li>Copie los datos en este formulario. Para la mayoría de los proveedores, seleccione STARTTLS.</li>
           <li>Guarde y presione «Probar conexión». El estado verde indica que el servidor aceptó la conexión y autenticación.</li>
         </ol>
-        <p><strong>Importante sobre los puertos:</strong> Supabase documenta restricciones de conexiones SMTP salientes por los puertos 25 y 587. Solicite a su proveedor un puerto alternativo habilitado; suelen utilizarse 2587 o 2525. El puerto 465 suele utilizar TLS directo y no figura entre las restricciones documentadas, pero confirme su disponibilidad con el proveedor y el entorno.</p>
+        <p><strong>Importante sobre los puertos:</strong> Supabase documenta restricciones de conexiones SMTP salientes por los puertos 25 y 587. Solicite a su proveedor un puerto alternativo habilitado; suelen utilizarse 2587 o 2525. El puerto 465 suele utilizar TLS directo y no figura entre las restricciones documentadas; si lo utiliza, seleccione «TLS directo». Confirme su disponibilidad con el proveedor y el entorno.</p>
         <p>Ejemplo orientativo: AWS SES ofrece el puerto 2587 con STARTTLS. Utilice los datos propios de su cuenta y región.</p>
         <p>Si el proveedor solo ofrece SMTP en los puertos restringidos, esta conexión directa no funcionará desde Supabase; utilice un proveedor con puerto alternativo o una integración de envío mediante API.</p>
         <p><strong>Clave de cifrado:</strong> agregue una cadena aleatoria de al menos 32 caracteres llamada <code>MAIL_SETTINGS_ENCRYPTION_KEY</code> en Supabase → Edge Functions → Secrets. Esta clave cifra las contraseñas SMTP guardadas por cada organización; no es la contraseña SMTP del remitente.</p>
