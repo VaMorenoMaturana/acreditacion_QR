@@ -41,10 +41,9 @@ function decodeBase64(value: string) {
   return bytes;
 }
 async function encryptionKey() {
-  const encoded = Deno.env.get("MAIL_SETTINGS_ENCRYPTION_KEY") || "";
-  if (!encoded) throw new Error("Falta configurar MAIL_SETTINGS_ENCRYPTION_KEY en Edge Function Secrets.");
-  const raw = decodeBase64(encoded);
-  if (raw.length !== 32) throw new Error("MAIL_SETTINGS_ENCRYPTION_KEY debe ser una clave Base64 de 32 bytes.");
+  const secret = Deno.env.get("MAIL_SETTINGS_ENCRYPTION_KEY") || "";
+  if (secret.length < 32) throw new Error("Configure MAIL_SETTINGS_ENCRYPTION_KEY como una cadena aleatoria de al menos 32 caracteres en Edge Function Secrets.");
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
   return await crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 async function encryptPassword(password: string) {
