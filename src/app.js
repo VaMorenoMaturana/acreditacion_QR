@@ -457,12 +457,18 @@ function resizeTicketPreview(){
 function renderTicketPreview(){
  const id=$("ticketRegistration").value,reg=selectedRegistration(id),preview=$("ticketPreview");preview.innerHTML="";if(!reg)return;
  try{
+  const custom=ticketSettings.template==="custom"&&ticketSettings.customDesign;
   const frame=document.createElement("div");frame.className="ticket-preview-frame"+(ticketSettings.template==="vertical"?" ticket-preview-vertical":"");
+  if(custom){const d=normalizeTicketDesign(ticketSettings.customDesign);frame.style.aspectRatio=d.widthMm+"/"+d.heightMm;frame.style.width="min(100%,"+d.widthMm+"mm)";}
   frame.appendChild(ticketDocument(reg));preview.appendChild(frame);resizeTicketPreview();
  }catch(e){preview.textContent=e.message;}
 }
 new ResizeObserver(resizeTicketPreview).observe($("ticketPreview"));
 function pdfWorker(root,scale=2){
+ const custom=root.dataset.ticketCustom==="true";
+ const vertical=root.classList.contains("ticket--vertical");
+ const pageWidth=custom?Number(root.dataset.pageWidthMm)+6:(vertical?96:303);
+ const pageHeight=custom?Number(root.dataset.pageHeightMm)+6:(vertical?156:104.08);
  return html2pdf().set({
   margin:3,
   image:{type:"jpeg",quality:.98},
@@ -473,7 +479,7 @@ function pdfWorker(root,scale=2){
     if(stage)Object.assign(stage.style,{left:"0px",top:"0px",opacity:"1",zIndex:"9999"});
    }
   },
-  jsPDF:{unit:"mm",format:root.classList.contains("ticket--vertical")?[96,156]:[303,104.08],orientation:root.classList.contains("ticket--vertical")?"portrait":"landscape"}
+  jsPDF:{unit:"mm",format:[pageWidth,pageHeight],orientation:pageWidth>=pageHeight?"landscape":"portrait"}
  }).from(root);
 }
 async function waitForTicketImages(root){
