@@ -2,6 +2,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { ticketMarkup } from "./ticket-template.js";
 import { ticketMarkupVertical } from "./ticket-template-vertical.js";
 import { initSuperadmin } from "./superadmin.js";
+import { createDefaultTicketDesign, normalizeTicketDesign, renderTicketDesign, ticketFieldLabels } from "./ticket-designer.js";
 
 const $ = id => document.getElementById(id);
 const validConfig = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("TU-PROYECTO") &&
@@ -15,7 +16,8 @@ const TICKET_DEFAULT_COLORS = {
  classic:{background:"#3c7894",accent:"#35105c",text:"#fffdf8"},
  vertical:{background:"#190b28",accent:"#83b6d0",text:"#f8f4fb"}
 };
-let ticketSettings={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+let ticketSettings={template:"classic",customTemplateId:null,customDesign:null,customTemplateName:"",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+let ticketTemplates=[],ticketEditorDesign=null,ticketEditorTemplateId="",ticketEditorSelectedId="",ticketEditorDrag=null;
 let mailSettingsMeta=null,mailConnected=false,mailLogsByRegistration=new Map(),mailSending=false,mailLogsReady=false,mailLogsActivityId="";
 const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const say = (id, message, bad=false) => { const el=$(id); if(el){el.textContent=message;el.style.color=bad?"#9b2828":"";} };
@@ -49,7 +51,7 @@ function selectedRegistration(id){return registrations.find(r=>r.id===id);}
 function ticketSettingsKey(){return `espacio-acredita:ticket-design:${currentProfile?.organization_id||"sin-organizacion"}`;}
 function safeTicketColor(value,fallback){return /^#[0-9a-f]{6}$/i.test(String(value||""))?value:fallback;}
 function loadTicketSettings(){
- const defaults={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+ const defaults={template:"classic",customTemplateId:null,customDesign:null,customTemplateName:"",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
  try{
   const saved=JSON.parse(localStorage.getItem(ticketSettingsKey())||"null");
   if(!saved||typeof saved!=="object")return defaults;
@@ -61,7 +63,11 @@ function loadTicketSettings(){
     text:safeTicketColor(saved.colors?.[format]?.text,defaults.colors[format].text)
    };
   }
-  return {template:saved.template==="vertical"?"vertical":"classic",colors};
+  return {
+   template:["classic","vertical","custom"].includes(saved.template)?saved.template:"classic",
+   customTemplateId:typeof saved.customTemplateId==="string"?saved.customTemplateId:null,
+   customDesign:null,customTemplateName:"",colors
+  };
  }catch(error){console.warn("No se pudieron leer los ajustes de entradas:",error);return defaults;}
 }
 function saveTicketSettings(){
@@ -70,15 +76,29 @@ function saveTicketSettings(){
 }
 function updateTicketDesignControls(){
  const format=$("ticketTemplate");if(!format)return;
- format.value=ticketSettings.template;
- const colors=ticketSettings.colors[ticketSettings.template];
- $("ticketBackground").value=colors.background;
- $("ticketAccent").value=colors.accent;
- $("ticketTextColor").value=colors.text;
+ format.value=ticketSettings.template==="custom"&&ticketSettings.customTemplateId?"custom:"+ticketSettings.customTemplateId:ticketSettings.template;
+ const custom=ticketSettings.template==="custom";
+ $("ticketQuickColorControls").classList.toggle("hidden",custom);
+ $("ticketOpenEditorBtn").textContent=custom?"Editar plantilla activa":"Crear una plantilla personalizada";
+ if(!custom){
+  const colors=ticketSettings.colors[ticketSettings.template]||ticketSettings.colors.classic;
+  $("ticketBackground").value=colors.background;
+  $("ticketAccent").value=colors.accent;
+  $("ticketTextColor").value=colors.text;
+ }
 }
 function selectTicketTemplate(){
- ticketSettings.template=$("ticketTemplate").value==="vertical"?"vertical":"classic";
+ const value=$("ticketTemplate").value;
+ if(value==="classic"||value==="vertical"){
+  ticketSettings.template=value;ticketSettings.customTemplateId=null;ticketSettings.customDesign=null;ticketSettings.customTemplateName="";
+ }else if(value.startsWith("custom:")){
+  const id=value.slice(7),template=ticketTemplates.find(item=>item.id===id);
+  if(!template)return;
+  ticketSettings.template="custom";ticketSettings.customTemplateId=template.id;
+  ticketSettings.customDesign=normalizeTicketDesign(template.design);ticketSettings.customTemplateName=template.name;
+ }
  saveTicketSettings();updateTicketDesignControls();renderTicketPreview();
+ if(ticketSettings.template==="custom")openTicketEditor();
 }
 function changeTicketColors(){
  const colors=ticketSettings.colors[ticketSettings.template];
