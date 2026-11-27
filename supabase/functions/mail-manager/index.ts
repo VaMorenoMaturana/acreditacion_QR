@@ -304,9 +304,36 @@ Deno.serve(async (req: Request) => {
         host: saved.smtp_host, port: saved.smtp_port, security: saved.smtp_security,
         username: saved.smtp_username, senderEmail: saved.sender_email, senderName: saved.sender_name,
       };
+      const allowResend = payload.allow_resend === true;
+      const { data: previousLogs, error: previousLogsError } = await admin.from("mail_delivery_logs")
+        .select("id,status").eq("organization_id", organizationId)
+        .eq("registration_id", registration.id).order("created_at", { ascending: false }).limit(1);
+      if (previousLogsError) throw new Error(previousLogsError.message);
+      const previousStatus = previousLogs?.[0]?.status;
+      if (!allowResend && (previousStatus === "sent" || previousStatus === "sending")) {
+        return fail(409, previousStatus === "sent"
+          ? "Esta inscripción ya tiene un envío aceptado por SMTP. Active la opción de reenvío para enviar otra copia."
+          : "Ya existe un envío en proceso o con resultado no confirmado para esta inscripción. Revise el historial antes de volver a intentarlo.");
+      }
+
+      const smtpPassword = await decryptPassword(saved.smtp_password_ciphertext);
+      const { data: deliveryLog, error: startLogError } = await admin.from("mail_delivery_logs").insert({
+        organization_id: organizationId,
+        activity_id: registration.activity_id,
+        registration_id: registration.id,
+        sent_by: callerData.user.id,
+        recipient_email: recipient,
+        subject,
+        status: "sending",
+      }).select("id").single();
+      if (startLogError) {
+        if (startLogError.code === "23505") return fail(409, "Ya existe un envío en proceso para esta inscripción.");
+        throw new Error("No se pudo registrar el inicio del envío. No se envió ningún correo.");
+      }
+
       let messageId: string | null = null;
       let sendError: string | null = null;
-      const transport = createTransport(config, await decryptPassword(saved.smtp_password_ciphertext));
+      const transport = createTransport(config, smtpPassword);
       try {
         const info = await transport.sendMail({
           from: { name: config.senderName, address: config.senderEmail },
@@ -325,18 +352,15 @@ Deno.serve(async (req: Request) => {
         transport.close();
       }
 
-      const { error: logError } = await admin.from("mail_delivery_logs").insert({
-        organization_id: organizationId,
-        activity_id: registration.activity_id,
-        registration_id: registration.id,
-        sent_by: callerData.user.id,
-        recipient_email: recipient,
-        subject,
+      const { error: finishLogError } = await admin.from("mail_delivery_logs").update({
         status: sendError ? "failed" : "sent",
         provider_message_id: messageId,
         error_message: sendError,
-      });
-      if (logError) console.error("No se pudo guardar el registro de entrega:", logError.message);
+      }).eq("id", deliveryLog.id).eq("organization_id", organizationId);
+      if (finishLogError) {
+        console.error("El correo pudo ser aceptado por SMTP, pero no se pudo actualizar el historial:", finishLogError.message);
+        return fail(500, "No se pudo confirmar el resultado en el historial. Revise el estado de esta inscripción antes de solicitar un reenvío.");
+      }
       if (sendError) return fail(502, `No se pudo enviar a ${recipient}: ${sendError}`);
       return jsonResponse(200, { sent: true, recipient, messageId });
     }
