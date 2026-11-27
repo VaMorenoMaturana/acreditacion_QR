@@ -622,7 +622,7 @@ async function sendMailEntries(){
     sent++;mailLogsByRegistration.set(reg.id,{registration_id:reg.id,status:"sent",recipient_email:reg.attendee.email});
    }catch(error){
     failed++;failures.push((reg.attendee?.full_name||"Participante")+": "+error.message);
-    if(/connection|connect|timeout|socket|enotfound|econn|tls|authentication/i.test(error.message)){
+    if(/connection|connect|timeout|socket|enotfound|econn|tls|authentication|network|fetch/i.test(error.message)){
      setMailConnectionStatus("disconnected","Conexión SMTP interrumpida durante el envío");
      failures.push("El servicio de correo se marcó como desconectado y el envío se detuvo.");
      break;
