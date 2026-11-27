@@ -16,7 +16,7 @@ const TICKET_DEFAULT_COLORS = {
  vertical:{background:"#190b28",accent:"#83b6d0",text:"#f8f4fb"}
 };
 let ticketSettings={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
-let mailSettingsMeta=null,mailConnected=false,mailLogsByRegistration=new Map(),mailSending=false;
+let mailSettingsMeta=null,mailConnected=false,mailLogsByRegistration=new Map(),mailSending=false,mailLogsReady=false,mailLogsActivityId="";
 const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const say = (id, message, bad=false) => { const el=$(id); if(el){el.textContent=message;el.style.color=bad?"#9b2828":"";} };
 const val = id => $(id).value.trim();
@@ -549,6 +549,7 @@ function mailActivityRecipients(){
  return registrations.filter(reg=>reg.activity_id===activityId&&reg.status!=="cancelled");
 }
 function mailEligibleRecipients(){
+ if(!mailLogsReady||mailLogsActivityId!==val("mailActivity"))return [];
  const resend=$("mailResendSent")?.checked===true;
  return mailActivityRecipients().filter(reg=>{
   const email=String(reg.attendee?.email||"").trim();
@@ -579,12 +580,13 @@ function renderMailRecipients(){
 }
 async function loadMailDeliveryLogs(){
  if(currentProfile?.role!=="admin")return;
- const activityId=val("mailActivity");mailLogsByRegistration=new Map();
- if(!activityId){renderMailRecipients();return;}
+ const activityId=val("mailActivity");mailLogsByRegistration=new Map();mailLogsReady=false;mailLogsActivityId=activityId;
+ if(!activityId){mailLogsReady=true;renderMailRecipients();return;}
  try{
   const result=await callMailManager("list_activity_logs",{activity_id:activityId});
   for(const log of result.logs||[])if(!mailLogsByRegistration.has(log.registration_id))mailLogsByRegistration.set(log.registration_id,log);
- }catch(error){say("mailProgressMessage",error.message,true);}
+  mailLogsReady=true;
+ }catch(error){say("mailProgressMessage",error.message,true);mailLogsReady=false;}
  renderMailRecipients();
 }
 async function ticketPdfBlob(reg){
