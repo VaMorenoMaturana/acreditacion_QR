@@ -75,7 +75,7 @@ export function normalizeTicketDesign(value) {
       const e = item && typeof item === "object" ? item : {};
       const type = ALLOWED_TYPES.has(e.type) ? e.type : "text";
       const normalized = {
-        id: String(e.id || "element-" + index).slice(0, 60),
+        id: String(e.id || "element-" + index).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 60) || "element-" + index,
         type,
         x: clamp(e.x, 0, 100, 10),
         y: clamp(e.y, 0, 100, 10),
