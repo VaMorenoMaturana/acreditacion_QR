@@ -89,6 +89,9 @@ function parseConfig(value: unknown): MailConfig {
   if ([25, 587].includes(port)) {
     throw new Error("Supabase Edge Functions restringe la salida SMTP por los puertos 25 y 587. Use un puerto alternativo habilitado por su proveedor, por ejemplo 2587 o 2525. El puerto 465 puede utilizarse con TLS directo si su proveedor y el entorno admiten la conexión.");
   }
+  if (port === 465 && security !== "tls") {
+    throw new Error("El puerto 465 normalmente requiere TLS directo. Seleccione «TLS directo» o use STARTTLS en un puerto alternativo compatible, como 2587.");
+  }
   if (!username) throw new Error("Ingrese el usuario SMTP.");
   if (!validEmail(senderEmail)) throw new Error("Ingrese un correo remitente válido.");
   if (!senderName || /[\\r\\n]/.test(senderName)) throw new Error("Ingrese un nombre remitente válido, sin saltos de línea.");
