@@ -309,14 +309,25 @@ Deno.serve(async (req: Request) => {
       };
       const allowResend = payload.allow_resend === true;
       const { data: previousLogs, error: previousLogsError } = await admin.from("mail_delivery_logs")
-        .select("id,status").eq("organization_id", organizationId)
+        .select("id,status,created_at").eq("organization_id", organizationId)
         .eq("registration_id", registration.id).order("created_at", { ascending: false }).limit(1);
       if (previousLogsError) throw new Error(previousLogsError.message);
-      const previousStatus = previousLogs?.[0]?.status;
-      if (!allowResend && (previousStatus === "sent" || previousStatus === "sending")) {
-        return fail(409, previousStatus === "sent"
-          ? "Esta inscripción ya tiene un envío aceptado por SMTP. Active la opción de reenvío para enviar otra copia."
-          : "Ya existe un envío en proceso o con resultado no confirmado para esta inscripción. Revise el historial antes de volver a intentarlo.");
+      const previousLog = previousLogs?.[0];
+      const previousStatus = previousLog?.status;
+      if (previousStatus === "sent" && !allowResend) {
+        return fail(409, "Esta inscripción ya tiene un envío aceptado por SMTP. Active la opción de reenvío para enviar otra copia.");
+      }
+      if (previousStatus === "sending") {
+        const startedAt = new Date(previousLog.created_at).getTime();
+        const ageMinutes = Number.isFinite(startedAt) ? (Date.now() - startedAt) / 60000 : 0;
+        if (!allowResend || ageMinutes < 10) {
+          return fail(409, "Existe un envío en curso o sin resultado confirmado. Espere al menos 10 minutos y revise el estado en su proveedor antes de habilitar un reenvío manual.");
+        }
+        const { error: staleLogError } = await admin.from("mail_delivery_logs").update({
+          status: "failed",
+          error_message: "Resultado anterior no confirmado. El administrador autorizó un reenvío después de revisar el proveedor SMTP.",
+        }).eq("id", previousLog.id).eq("organization_id", organizationId).eq("status", "sending");
+        if (staleLogError) throw new Error("No se pudo cerrar el intento anterior antes del reenvío: " + staleLogError.message);
       }
 
       const smtpPassword = await decryptPassword(saved.smtp_password_ciphertext);
