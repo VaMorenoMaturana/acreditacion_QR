@@ -84,7 +84,7 @@ function parseConfig(value: unknown): MailConfig {
   const username = textValue(data.username, 254);
   const senderEmail = textValue(data.senderEmail, 254).toLowerCase();
   const senderName = textValue(data.senderName, 120);
-  if (!host || /\s/.test(host)) throw new Error("Ingrese un servidor SMTP válido.");
+  if (!/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) || host.includes("..")) throw new Error("Ingrese solo el nombre del servidor SMTP, sin https:// ni rutas. Para Gmail utilice smtp.gmail.com.");
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("El puerto SMTP debe ser un número entre 1 y 65535.");
   if ([25, 587].includes(port)) {
     throw new Error("Supabase Edge Functions restringe la salida SMTP por los puertos 25 y 587. Use un puerto alternativo habilitado por su proveedor, por ejemplo 2587 o 2525. El puerto 465 puede utilizarse con TLS directo si su proveedor y el entorno admiten la conexión.");
