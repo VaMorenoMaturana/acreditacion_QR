@@ -42,3 +42,23 @@
 .export-actions{margin:10px 0 4px}
 .error-message{color:#9b2828}
 .error-message:empty{display:none}
+
+/* Envío de entradas por correo: estado SMTP y configuración */
+.mail-status-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.mail-status-indicator{display:flex;align-items:center;gap:9px;font-size:13px}
+.mail-status-dot{display:inline-block;width:10px;height:10px;min-width:10px;border-radius:50%;vertical-align:middle;background:#9b2828;box-shadow:0 0 0 3px #9b28281c}
+.mail-status-dot.connected{background:#159455;box-shadow:0 0 0 3px #15945522}
+.mail-status-dot.disconnected{background:#c03932;box-shadow:0 0 0 3px #c0393220}
+.mail-status-dot.connecting{background:#d58a17;box-shadow:0 0 0 3px #d58a1726;animation:mailPulse 1.1s ease-in-out infinite}
+@keyframes mailPulse{50%{opacity:.38}}
+.mail-tutorial{margin-top:18px;padding:16px;background:#f8f6fa;border:1px solid #e8e1ed;border-radius:10px;color:#51475a}
+.mail-tutorial h3{margin:0 0 8px;font-size:15px;color:#251e2b}
+.mail-tutorial ol{padding-left:22px;margin:8px 0 12px}
+.mail-tutorial li{margin:6px 0;font-size:13px}
+.mail-tutorial p{font-size:13px;margin:8px 0}
+.mail-checkbox{display:flex;flex-direction:row;align-items:center;gap:8px;margin-top:12px}
+.mail-checkbox input{width:16px;min-width:16px;height:16px}
+.mail-results{font-size:13px;color:#51475a}
+.mail-results ul{padding-left:22px;margin-top:8px}
+.mail-results li{margin:4px 0}
+#mailRecipientsTable table{min-width:600px}
