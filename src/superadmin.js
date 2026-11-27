@@ -317,6 +317,48 @@ async function deleteUser(id) {
   try { const result = await api("delete_user",{id}); alert(result.message); await refreshAll(); }
   catch(error) { alert(error.message); }
 }
+async function changeOwnPassword(ev) {
+  ev.preventDefault();
+  const currentPassword = $("superAccountCurrentPassword").value;
+  const newPassword = $("superAccountNewPassword").value;
+  const confirmPassword = $("superAccountConfirmPassword").value;
+  if (!currentPassword) {
+    message("superAccountPasswordMessage","Ingrese su contraseña actual.",true);
+    return;
+  }
+  if (newPassword.length < 14) {
+    message("superAccountPasswordMessage","La nueva contraseña debe tener al menos 14 caracteres.",true);
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    message("superAccountPasswordMessage","La nueva contraseña y su confirmación no coinciden.",true);
+    return;
+  }
+  if (newPassword === currentPassword) {
+    message("superAccountPasswordMessage","La nueva contraseña debe ser distinta de la actual.",true);
+    return;
+  }
+  const button = $("superAccountPasswordSaveBtn");
+  button.disabled = true;
+  button.textContent = "Actualizando…";
+  message("superAccountPasswordMessage","Verificando la contraseña actual y actualizando la cuenta…");
+  try {
+    const { data, error } = await client.auth.updateUser({
+      password: newPassword,
+      current_password: currentPassword,
+    });
+    if (error) throw error;
+    currentUser = data.user || currentUser;
+    $("superAccountPasswordForm").reset();
+    message("superAccountPasswordMessage","Contraseña actualizada correctamente.");
+  } catch (error) {
+    const details = error?.message || "No se pudo actualizar la contraseña.";
+    message("superAccountPasswordMessage",details,true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Actualizar contraseña";
+  }
+}
 async function toggleUser(id, suspended) {
   const user = users.find(value => value.id === id); if (!user) return;
   try { const result = await api("set_user_access",{id,suspended:!suspended}); alert(result.message); await refreshAll(); }
@@ -379,6 +421,8 @@ export async function initSuperadmin(supabase, user) {
       button.addEventListener("click",()=>switchView(button.dataset.superView))
     );
     $("superRefreshBtn").addEventListener("click",refreshAll);
+    $("superAccountEmail").textContent = currentUser?.email || "Cuenta autenticada";
+    $("superAccountPasswordForm").addEventListener("submit",changeOwnPassword);
     $("superOrganizationForm").addEventListener("submit",saveOrganization);
     $("superOrganizationClearBtn").addEventListener("click",clearOrganizationForm);
     $("superUserForm").addEventListener("submit",saveUser);
