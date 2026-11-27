@@ -5,7 +5,7 @@ create table if not exists public.ticket_templates (
   name text not null check (char_length(btrim(name)) between 1 and 80),
   design jsonb not null check (
     jsonb_typeof(design) = 'object'
-    and pg_column_size(design) <= 4000000
+    and pg_column_size(design) <= 6000000
   ),
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
