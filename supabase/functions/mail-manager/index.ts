@@ -10,7 +10,16 @@ type MailConfig = {
   senderEmail: string;
   senderName: string;
 };
-type SavedMailConfig = MailConfig & { smtp_password_ciphertext: string };
+type SavedMailConfig = {
+  smtp_host: string;
+  smtp_port: number;
+  smtp_security: "starttls" | "tls";
+  smtp_username: string;
+  smtp_password_ciphertext: string;
+  sender_email: string;
+  sender_name: string;
+  updated_at: string;
+};
 
 function jsonResponse(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -81,7 +90,7 @@ function parseConfig(value: unknown): MailConfig {
   }
   if (!username) throw new Error("Ingrese el usuario SMTP.");
   if (!validEmail(senderEmail)) throw new Error("Ingrese un correo remitente válido.");
-  if (!senderName) throw new Error("Ingrese el nombre que aparecerá como remitente.");
+  if (!senderName || /[\\r\\n]/.test(senderName)) throw new Error("Ingrese un nombre remitente válido, sin saltos de línea.");
   return { host, port, security, username, senderEmail, senderName };
 }
 function createTransport(config: MailConfig, password: string) {
