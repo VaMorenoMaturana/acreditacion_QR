@@ -129,21 +129,148 @@
 </div>
   </section>
   <section id="tab-tickets" class="tab-panel hidden">
-    <div class="page-head"><div><h1>Entradas PDF/ZIP</h1><p class="muted">Seleccione el formato, personalice sus colores y genere entradas PDF o ZIP.</p></div></div>
-    <div class="panel"><h2>Diseño de entrada</h2>
-      <p class="muted">Seleccione una de las dos plantillas y ajuste sus colores. La plantilla horizontal conserva el diseño de Liderazgo en 100 Palabras; la vertical incorpora una composición genérica. Los ajustes se guardan en este navegador para la organización actual.</p>
+    <div class="page-head"><div><h1>Entradas PDF/ZIP</h1><p class="muted">Diseñe, guarde y reutilice plantillas de entradas para su organización.</p></div></div>
+    <div class="panel">
+      <h2>Plantilla activa</h2>
+      <p class="muted">Puede conservar los formatos clásicos o seleccionar una plantilla propia. Las plantillas guardadas estarán disponibles para los usuarios de su organización.</p>
       <div class="form-grid ticket-design-controls">
-        <label class="span-2">Formato<select id="ticketTemplate"><option value="classic">Clásica horizontal · Liderazgo en 100 Palabras</option><option value="vertical">Moderna vertical · Genérica</option></select></label>
-        <label>Color de fondo<input id="ticketBackground" type="color" value="#3c7894"></label>
-        <label>Color de acento<input id="ticketAccent" type="color" value="#35105c"></label>
-        <label>Color de texto<input id="ticketTextColor" type="color" value="#fffdf8"></label>
-        <div class="form-actions"><button id="ticketResetDesignBtn" class="secondary" type="button">Restaurar colores del formato</button></div>
+        <label class="span-2">Formato de entrada
+          <select id="ticketTemplate">
+            <option value="classic">Clásica horizontal · Liderazgo en 100 Palabras</option>
+            <option value="vertical">Moderna vertical · Genérica</option>
+          </select>
+        </label>
+        <div id="ticketQuickColorControls" class="ticket-quick-colors span-2">
+          <label>Color de fondo<input id="ticketBackground" type="color" value="#3c7894"></label>
+          <label>Color de acento<input id="ticketAccent" type="color" value="#35105c"></label>
+          <label>Color de texto<input id="ticketTextColor" type="color" value="#fffdf8"></label>
+          <div class="form-actions"><button id="ticketResetDesignBtn" class="secondary" type="button">Restaurar colores</button></div>
+        </div>
+        <div class="form-actions span-2"><button id="ticketOpenEditorBtn" class="primary" type="button">Crear o editar una plantilla</button></div>
+      </div>
+      <div id="ticketEditorPanel" class="ticket-editor hidden">
+        <div class="ticket-editor-toolbar">
+          <label>Nombre de la plantilla<input id="ticketEditorName" maxlength="80" placeholder="Ej. Entrada corporativa"></label>
+          <div class="ticket-editor-actions">
+            <button id="ticketEditorNewBtn" type="button" class="secondary">Nueva</button>
+            <button id="ticketEditorSaveBtn" type="button" class="primary">Guardar plantilla</button>
+            <button id="ticketEditorDeleteBtn" type="button" class="danger-solid">Eliminar</button>
+            <button id="ticketEditorCloseBtn" type="button" class="secondary">Cerrar editor</button>
+          </div>
+        </div>
+        <p id="ticketEditorMessage" class="message" role="status"></p>
+        <div class="ticket-editor-layout">
+          <div class="ticket-editor-workspace">
+            <div class="ticket-editor-stage-wrap">
+              <div id="ticketEditorStage" class="ticket-editor-stage" aria-label="Lienzo de diseño de entrada"></div>
+            </div>
+            <div class="ticket-editor-addbar">
+              <label>Añadir elemento
+                <select id="ticketAddElement">
+                  <optgroup label="Datos automáticos">
+                    <option value="field:attendeeName">Nombre del participante</option>
+                    <option value="field:organization">Organización</option>
+                    <option value="field:eventName">Nombre del evento</option>
+                    <option value="field:eventDescription">Descripción del evento</option>
+                    <option value="field:date">Fecha</option>
+                    <option value="field:time">Horario</option>
+                    <option value="field:place">Lugar</option>
+                    <option value="field:row">Fila</option>
+                    <option value="field:seat">Asiento</option>
+                    <option value="field:accessLabel">Texto de acceso</option>
+                    <option value="field:website">Sitio web</option>
+                  </optgroup>
+                  <optgroup label="Elementos gráficos">
+                    <option value="text">Texto libre</option>
+                    <option value="logo:institution">Logo institucional</option>
+                    <option value="logo:project">Logo de proyecto</option>
+                    <option value="logo:partner">Logo de aliado</option>
+                    <option value="qr">Código QR</option>
+                    <option value="shape:rect">Rectángulo</option>
+                    <option value="shape:circle">Círculo</option>
+                    <option value="shape:line">Línea</option>
+                  </optgroup>
+                </select>
+              </label>
+              <button id="ticketAddElementBtn" type="button" class="secondary">Añadir</button>
+              <span class="muted">Arrastre los elementos para moverlos. Use la esquina inferior derecha para cambiar su tamaño.</span>
+            </div>
+          </div>
+          <aside class="ticket-editor-inspector">
+            <div class="ticket-editor-section">
+              <h3>Formato y fondo</h3>
+              <div class="ticket-editor-fields">
+                <label>Ancho (mm)<input id="ticketCanvasWidth" type="number" min="80" max="350" step="1"></label>
+                <label>Alto (mm)<input id="ticketCanvasHeight" type="number" min="60" max="350" step="1"></label>
+                <label>Fondo<select id="ticketBackgroundType"><option value="solid">Color único</option><option value="gradient">Degradado</option></select></label>
+                <label>Patrón<select id="ticketPattern"><option value="none">Sin diseño</option><option value="grid">Cuadrícula</option><option value="dots">Puntos</option><option value="diagonal">Líneas diagonales</option></select></label>
+                <label>Color principal<input id="ticketCanvasColor1" type="color"></label>
+                <label id="ticketGradientColorLabel">Color secundario<input id="ticketCanvasColor2" type="color"></label>
+                <label>Ángulo degradado (°)<input id="ticketGradientAngle" type="number" min="0" max="360"></label>
+                <label>Forma<select id="ticketCornerStyle"><option value="square">Rectangular</option><option value="rounded">Esquinas redondeadas</option><option value="ticket">Borde recortado</option></select></label>
+                <label>Radio de borde (mm)<input id="ticketCornerRadius" type="number" min="0" max="25" step="0.5"></label>
+                <label>Grosor de borde (mm)<input id="ticketBorderWidth" type="number" min="0" max="8" step="0.5"></label>
+                <label>Color del borde<input id="ticketBorderColor" type="color"></label>
+              </div>
+            </div>
+            <div class="ticket-editor-section">
+              <h3>Elemento seleccionado</h3>
+              <p id="ticketInspectorEmpty" class="muted">Seleccione un elemento del lienzo para editar sus propiedades.</p>
+              <div id="ticketInspectorFields" class="hidden">
+                <div class="ticket-editor-fields ticket-position-fields">
+                  <label>X (%)<input id="ticketPropX" type="number" min="0" max="100" step="0.5"></label>
+                  <label>Y (%)<input id="ticketPropY" type="number" min="0" max="100" step="0.5"></label>
+                  <label>Ancho (%)<input id="ticketPropW" type="number" min="1" max="100" step="0.5"></label>
+                  <label>Alto (%)<input id="ticketPropH" type="number" min="1" max="100" step="0.5"></label>
+                </div>
+                <div id="ticketTextProps" class="ticket-editor-subsection">
+                  <label id="ticketPropTextLabel">Contenido<textarea id="ticketPropText" rows="2" maxlength="500"></textarea></label>
+                  <div class="ticket-editor-fields">
+                    <label>Tamaño de letra<input id="ticketPropFontSize" type="number" min="6" max="120"></label>
+                    <label>Familia<select id="ticketPropFontFamily"><option>Arial</option><option>Georgia</option><option>Inter</option><option>Verdana</option><option>Times New Roman</option><option>Trebuchet MS</option><option>Courier New</option></select></label>
+                    <label>Peso<select id="ticketPropFontWeight"><option value="400">Normal</option><option value="500">Medio</option><option value="600">Seminegrita</option><option value="700">Negrita</option><option value="800">Extra negrita</option></select></label>
+                    <label>Color de texto<input id="ticketPropColor" type="color"></label>
+                    <label>Alineación<select id="ticketPropAlign"><option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option></select></label>
+                    <label>Vertical<select id="ticketPropVAlign"><option value="top">Arriba</option><option value="middle">Centro</option><option value="bottom">Abajo</option></select></label>
+                  </div>
+                </div>
+                <div id="ticketLogoProps" class="ticket-editor-subsection hidden">
+                  <label>Origen del logo<select id="ticketPropLogoSource"><option value="institution">Institucional (actividad)</option><option value="project">Proyecto (actividad)</option><option value="partner">Aliado (actividad)</option><option value="custom">Imagen propia de la plantilla</option></select></label>
+                  <label id="ticketCustomLogoUploadLabel" class="hidden">Cargar imagen<input id="ticketCustomLogoUpload" type="file" accept="image/png,image/jpeg,image/webp"></label>
+                  <label>Ajuste de imagen<select id="ticketPropLogoFit"><option value="contain">Contener</option><option value="cover">Rellenar</option></select></label>
+                </div>
+                <div id="ticketShapeProps" class="ticket-editor-subsection hidden">
+                  <label>Forma<select id="ticketPropShape"><option value="rect">Rectángulo</option><option value="circle">Círculo</option><option value="line">Línea</option></select></label>
+                  <div class="ticket-editor-fields">
+                    <label>Relleno<input id="ticketPropFill" type="color"></label>
+                    <label>Contorno<input id="ticketPropStroke" type="color"></label>
+                    <label>Grosor<input id="ticketPropStrokeWidth" type="number" min="0" max="12" step="0.5"></label>
+                    <label>Radio<input id="ticketPropRadius" type="number" min="0" max="50" step="0.5"></label>
+                  </div>
+                </div>
+                <div id="ticketQrProps" class="ticket-editor-subsection hidden">
+                  <div class="ticket-editor-fields">
+                    <label>Fondo QR<input id="ticketPropQrBackground" type="color"></label>
+                    <label>Contorno QR<input id="ticketPropQrBorder" type="color"></label>
+                    <label>Grosor<input id="ticketPropQrBorderWidth" type="number" min="0" max="12" step="0.5"></label>
+                    <label>Radio<input id="ticketPropQrRadius" type="number" min="0" max="30" step="0.5"></label>
+                  </div>
+                </div>
+                <div class="ticket-editor-actions">
+                  <button id="ticketDuplicateElementBtn" type="button" class="secondary">Duplicar</button>
+                  <button id="ticketDeleteElementBtn" type="button" class="danger-solid">Eliminar elemento</button>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+        <p class="muted">Los datos de participantes, evento, fecha, ubicación y QR se completan automáticamente al generar cada entrada. Puede añadir hasta 32 elementos por plantilla y hasta 8 logotipos.</p>
       </div>
     </div>
     <div class="panel"><div class="form-grid"><label class="span-2">Actividad<select id="ticketActivity"></select></label><label class="span-2">Persona inscrita<select id="ticketRegistration"></select></label></div>
       <div class="form-actions"><button id="downloadOneBtn" class="primary" type="button">Descargar entrada PDF</button><button id="downloadZipBtn" class="secondary" type="button">Descargar todas las entradas (ZIP)</button></div><p id="ticketMessage" class="message" role="status"></p>
     </div>
-    <div class="panel"><h2>Vista previa</h2><div id="ticketPreview" class="ticket-preview"></div></div>
+    <div class="panel"><h2>Vista previa de la entrada final</h2><div id="ticketPreview" class="ticket-preview"></div></div>
   </section>
   <section id="tab-mail" class="tab-panel hidden">
     <div class="page-head"><div><h1>Envío de entradas por correo</h1><p class="muted">Cada participante recibirá un correo individual con su entrada PDF y su propio código QR.</p></div></div>
