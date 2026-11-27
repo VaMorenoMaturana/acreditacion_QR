@@ -2,6 +2,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { ticketMarkup } from "./ticket-template.js";
 import { ticketMarkupVertical } from "./ticket-template-vertical.js";
 import { initSuperadmin } from "./superadmin.js";
+import { createDefaultTicketDesign, normalizeTicketDesign, renderTicketDesign, ticketFieldLabels } from "./ticket-designer.js";
 
 const $ = id => document.getElementById(id);
 const validConfig = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("TU-PROYECTO") &&
@@ -15,7 +16,8 @@ const TICKET_DEFAULT_COLORS = {
  classic:{background:"#3c7894",accent:"#35105c",text:"#fffdf8"},
  vertical:{background:"#190b28",accent:"#83b6d0",text:"#f8f4fb"}
 };
-let ticketSettings={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+let ticketSettings={template:"classic",customTemplateId:null,customDesign:null,customTemplateName:"",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+let ticketTemplates=[],ticketEditorDesign=null,ticketEditorTemplateId="",ticketEditorSelectedId="",ticketEditorDrag=null;
 let mailSettingsMeta=null,mailConnected=false,mailLogsByRegistration=new Map(),mailSending=false,mailLogsReady=false,mailLogsActivityId="";
 const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const say = (id, message, bad=false) => { const el=$(id); if(el){el.textContent=message;el.style.color=bad?"#9b2828":"";} };
@@ -49,7 +51,7 @@ function selectedRegistration(id){return registrations.find(r=>r.id===id);}
 function ticketSettingsKey(){return `espacio-acredita:ticket-design:${currentProfile?.organization_id||"sin-organizacion"}`;}
 function safeTicketColor(value,fallback){return /^#[0-9a-f]{6}$/i.test(String(value||""))?value:fallback;}
 function loadTicketSettings(){
- const defaults={template:"classic",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
+ const defaults={template:"classic",customTemplateId:null,customDesign:null,customTemplateName:"",colors:{classic:{...TICKET_DEFAULT_COLORS.classic},vertical:{...TICKET_DEFAULT_COLORS.vertical}}};
  try{
   const saved=JSON.parse(localStorage.getItem(ticketSettingsKey())||"null");
   if(!saved||typeof saved!=="object")return defaults;
@@ -61,23 +63,42 @@ function loadTicketSettings(){
     text:safeTicketColor(saved.colors?.[format]?.text,defaults.colors[format].text)
    };
   }
-  return {template:saved.template==="vertical"?"vertical":"classic",colors};
+  return {
+   template:["classic","vertical","custom"].includes(saved.template)?saved.template:"classic",
+   customTemplateId:typeof saved.customTemplateId==="string"?saved.customTemplateId:null,
+   customDesign:null,customTemplateName:"",colors
+  };
  }catch(error){console.warn("No se pudieron leer los ajustes de entradas:",error);return defaults;}
 }
 function saveTicketSettings(){
- try{localStorage.setItem(ticketSettingsKey(),JSON.stringify(ticketSettings));}
- catch(error){console.warn("No se pudieron guardar los ajustes de entradas:",error);}
+ try{
+  const persisted={template:ticketSettings.template,customTemplateId:ticketSettings.customTemplateId,colors:ticketSettings.colors};
+  localStorage.setItem(ticketSettingsKey(),JSON.stringify(persisted));
+ }catch(error){console.warn("No se pudieron guardar los ajustes de entradas:",error);}
 }
 function updateTicketDesignControls(){
  const format=$("ticketTemplate");if(!format)return;
- format.value=ticketSettings.template;
- const colors=ticketSettings.colors[ticketSettings.template];
- $("ticketBackground").value=colors.background;
- $("ticketAccent").value=colors.accent;
- $("ticketTextColor").value=colors.text;
+ format.value=ticketSettings.template==="custom"&&ticketSettings.customTemplateId?"custom:"+ticketSettings.customTemplateId:ticketSettings.template;
+ const custom=ticketSettings.template==="custom";
+ $("ticketQuickColorControls").classList.toggle("hidden",custom);
+ $("ticketOpenEditorBtn").textContent=custom?"Editar plantilla activa":"Crear una plantilla personalizada";
+ if(!custom){
+  const colors=ticketSettings.colors[ticketSettings.template]||ticketSettings.colors.classic;
+  $("ticketBackground").value=colors.background;
+  $("ticketAccent").value=colors.accent;
+  $("ticketTextColor").value=colors.text;
+ }
 }
 function selectTicketTemplate(){
- ticketSettings.template=$("ticketTemplate").value==="vertical"?"vertical":"classic";
+ const value=$("ticketTemplate").value;
+ if(value==="classic"||value==="vertical"){
+  ticketSettings.template=value;ticketSettings.customTemplateId=null;ticketSettings.customDesign=null;ticketSettings.customTemplateName="";
+ }else if(value.startsWith("custom:")){
+  const id=value.slice(7),template=ticketTemplates.find(item=>item.id===id);
+  if(!template)return;
+  ticketSettings.template="custom";ticketSettings.customTemplateId=template.id;
+  ticketSettings.customDesign=normalizeTicketDesign(template.design);ticketSettings.customTemplateName=template.name;
+ }
  saveTicketSettings();updateTicketDesignControls();renderTicketPreview();
 }
 function changeTicketColors(){
@@ -373,8 +394,37 @@ async function importCsv(){
  await loadAll();refreshCsvDuplicateWarnings();
  say("csvMessage",'Importadas '+ok+' filas'+(duplicateImported?' (incluidas '+duplicateImported+' con correo repetido)':'')+'.'+(failed.length?' Errores: '+failed.slice(0,5).join(" | "):''),failed.length>0);
 }
+function ticketDataForRegistration(reg){
+ const a=selectedActivity(reg.activity_id);if(!a)throw new Error("No se encontró la actividad de esta inscripción.");
+ const start=ticketTime(a.start_time),end=ticketTime(a.end_time);
+ return {
+  attendeeName:reg.attendee?.full_name||"Participante",
+  organization:reg.attendee?.organization||"",
+  eventName:a.name||"Evento",
+  eventDescription:a.tagline||a.description||"",
+  date:ticketDateLabel(a.event_date),
+  time:start?`${start}${end?"–"+end:""}`:"Por definir",
+  place:a.place||"",
+  row:reg.seat_row||"",
+  seat:reg.seat_number||"",
+  accessLabel:"ACCESO ÚNICO",
+  website:"www.espaciomejor.org",
+  logos:{institution:a.institution_logo||"",project:a.project_logo||"",partner:a.partner_logo||""}
+ };
+}
+function ticketQrDataUrl(token){
+ const qrHolder=document.createElement("div");qrHolder.style.cssText="position:absolute;left:-99999px;top:0";
+ document.body.appendChild(qrHolder);
+ new QRCode(qrHolder,{text:token||"ESPACIO-ACREDITA",width:320,height:320,colorDark:"#17151c",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+ const canvas=qrHolder.querySelector("canvas"),image=canvas?canvas.toDataURL("image/png"):"";
+ qrHolder.remove();return image;
+}
 function ticketDocument(reg,design=ticketSettings){
  const a=selectedActivity(reg.activity_id);if(!a)throw new Error("No se encontró la actividad de esta inscripción.");
+ const data=ticketDataForRegistration(reg);
+ if(design.template==="custom"&&design.customDesign){
+  return renderTicketDesign(design.customDesign,data,{print:true,qrSrc:ticketQrDataUrl(reg.qr_token)});
+ }
  const format=design.template==="vertical"?"vertical":"classic";
  const markup=format==="vertical"?ticketMarkupVertical:ticketMarkup;
  const host=document.createElement("div");
@@ -385,20 +435,16 @@ function ticketDocument(reg,design=ticketSettings){
  root.style.setProperty("--ticket-accent",safeTicketColor(colors.accent,TICKET_DEFAULT_COLORS[format].accent));
  root.style.setProperty("--ticket-text",safeTicketColor(colors.text,TICKET_DEFAULT_COLORS[format].text));
  const set=(id,text)=>{const el=root.querySelector("#"+id);if(el)el.textContent=text||"";};
- set("previewPerson",reg.attendee.full_name);set("previewOrg",reg.attendee.organization||"");
- set("previewEventName",a.name);set("previewEventDesc",a.tagline||a.description||"");
- const start=ticketTime(a.start_time),end=ticketTime(a.end_time);
- set("previewDate",ticketDateLabel(a.event_date));set("previewTime",start?`${start}${end?"–"+end:""}`:"Por definir");set("previewPlace",a.place);
+ set("previewPerson",data.attendeeName);set("previewOrg",data.organization);
+ set("previewEventName",data.eventName);set("previewEventDesc",data.eventDescription);
+ set("previewDate",data.date);set("previewTime",data.time);set("previewPlace",data.place);
  const seatLabels=root.querySelectorAll(".seat div");
- if(seatLabels[0])seatLabels[0].textContent=`FILA: ${reg.seat_row||"-"}`;
- if(seatLabels[1])seatLabels[1].textContent=`ASIENTO: ${reg.seat_number||"-"}`;
+ if(seatLabels[0])seatLabels[0].textContent="FILA: "+(data.row||"-");
+ if(seatLabels[1])seatLabels[1].textContent="ASIENTO: "+(data.seat||"-");
  const imgs=[["logoPreview",a.institution_logo],["projectLogoPreview",a.project_logo],["partnerLogoPreview",a.partner_logo]];
  imgs.forEach(([id,src])=>{const img=root.querySelector("#"+id);if(src){img.src=src;img.hidden=false;img.style.display="block";}else if(img)img.remove();});
  const qr=root.querySelector("#qrPreview");qr.removeAttribute("src");qr.alt="Código QR";
- const qrHolder=document.createElement("div");qrHolder.style.cssText="position:absolute;left:-99999px;top:0";
- document.body.appendChild(qrHolder);
- new QRCode(qrHolder,{text:reg.qr_token,width:320,height:320,colorDark:"#17151c",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
- const canvas=qrHolder.querySelector("canvas");if(canvas)qr.src=canvas.toDataURL("image/png");qrHolder.remove();
+ qr.src=ticketQrDataUrl(reg.qr_token);
  return root;
 }
 function resizeTicketPreview(){
@@ -410,12 +456,403 @@ function resizeTicketPreview(){
 function renderTicketPreview(){
  const id=$("ticketRegistration").value,reg=selectedRegistration(id),preview=$("ticketPreview");preview.innerHTML="";if(!reg)return;
  try{
+  const custom=ticketSettings.template==="custom"&&ticketSettings.customDesign;
   const frame=document.createElement("div");frame.className="ticket-preview-frame"+(ticketSettings.template==="vertical"?" ticket-preview-vertical":"");
+  if(custom){const d=normalizeTicketDesign(ticketSettings.customDesign);frame.style.aspectRatio=d.widthMm+"/"+d.heightMm;frame.style.width="min(100%,"+d.widthMm+"mm)";}
   frame.appendChild(ticketDocument(reg));preview.appendChild(frame);resizeTicketPreview();
  }catch(e){preview.textContent=e.message;}
 }
+function cloneTicketDesign(value){return JSON.parse(JSON.stringify(value));}
+function selectedTicketEditorElement(){
+ return ticketEditorDesign?.elements?.find(item=>item.id===ticketEditorSelectedId)||null;
+}
+function ticketEditorIsAdmin(){return currentProfile?.role==="admin";}
+function refreshTicketTemplateOptions(){
+ const select=$("ticketTemplate");if(!select)return;
+ const current=ticketSettings.template==="custom"&&ticketSettings.customTemplateId?"custom:"+ticketSettings.customTemplateId:ticketSettings.template;
+ select.innerHTML="";
+ const builtins=[
+  ["classic","Clásica horizontal · Liderazgo en 100 Palabras"],
+  ["vertical","Moderna vertical · Genérica"]
+ ];
+ builtins.forEach(([value,label])=>{const option=document.createElement("option");option.value=value;option.textContent=label;select.appendChild(option);});
+ if(ticketTemplates.length){
+  const group=document.createElement("optgroup");group.label="Plantillas de su organización";
+  ticketTemplates.forEach(template=>{const option=document.createElement("option");option.value="custom:"+template.id;option.textContent=template.name;group.appendChild(option);});
+  select.appendChild(group);
+ }
+ if([...select.options].some(option=>option.value===current))select.value=current;
+ else if(ticketSettings.template==="custom"){ticketSettings.template="classic";ticketSettings.customTemplateId=null;ticketSettings.customDesign=null;}
+ updateTicketDesignControls();
+}
+async function loadTicketTemplates(){
+ if(!currentProfile?.organization_id||!["admin","staff"].includes(currentProfile.role))return;
+ const {data,error}=await supabase.from("ticket_templates")
+  .select("id,name,design,updated_at").order("updated_at",{ascending:false});
+ if(error){
+  console.warn("No se pudieron cargar las plantillas de entradas:",error.message);
+  say("ticketEditorMessage","No se pudieron cargar las plantillas guardadas. Compruebe que aplicó la migración ticket_templates en Supabase.",true);
+  ticketTemplates=[];refreshTicketTemplateOptions();return;
+ }
+ ticketTemplates=data||[];
+ if(ticketSettings.template==="custom"){
+  const active=ticketTemplates.find(item=>item.id===ticketSettings.customTemplateId);
+  if(active){ticketSettings.customDesign=normalizeTicketDesign(active.design);ticketSettings.customTemplateName=active.name;}
+  else{ticketSettings.template="classic";ticketSettings.customTemplateId=null;ticketSettings.customDesign=null;ticketSettings.customTemplateName="";}
+ }
+ refreshTicketTemplateOptions();saveTicketSettings();renderTicketPreview();
+}
+function openTicketEditor(){
+ const panel=$("ticketEditorPanel");panel.classList.remove("hidden");
+ if(ticketSettings.template==="custom"&&ticketSettings.customDesign){
+  ticketEditorDesign=normalizeTicketDesign(ticketSettings.customDesign);
+  ticketEditorTemplateId=ticketSettings.customTemplateId||"";
+  $("ticketEditorName").value=ticketSettings.customTemplateName||"";
+ }else{
+  ticketEditorDesign=createDefaultTicketDesign();
+  ticketEditorTemplateId="";
+  $("ticketEditorName").value="";
+ }
+ ticketEditorSelectedId="";
+ $("ticketEditorNewBtn").classList.toggle("hidden",!ticketEditorIsAdmin());
+ $("ticketEditorCopyBtn").classList.toggle("hidden",!ticketEditorIsAdmin()||!ticketEditorTemplateId);
+ $("ticketEditorSaveBtn").classList.toggle("hidden",!ticketEditorIsAdmin());
+ $("ticketEditorDeleteBtn").classList.toggle("hidden",!ticketEditorIsAdmin()||!ticketEditorTemplateId);
+ const readOnly=!ticketEditorIsAdmin();
+ document.querySelectorAll("#ticketEditorPanel input,#ticketEditorPanel select,#ticketEditorPanel textarea").forEach(control=>{control.disabled=readOnly;});
+ document.querySelectorAll("#ticketEditorPanel button").forEach(button=>{button.disabled=readOnly&&button.id!=="ticketEditorCloseBtn";});
+ $("ticketEditorStage").classList.toggle("ticket-editor-readonly",readOnly);
+ renderTicketEditorControls();renderTicketEditorStage();renderTicketInspector();
+ if(!ticketEditorIsAdmin())say("ticketEditorMessage","Vista de solo lectura. Solo el administrador puede crear, modificar o eliminar las plantillas de la organización.");
+ else say("ticketEditorMessage",ticketEditorTemplateId?"Edite los elementos y guarde los cambios de esta plantilla.":"Diseñe una nueva plantilla y guárdela para reutilizarla.");
+}
+function closeTicketEditor(){$("ticketEditorPanel").classList.add("hidden");}
+function newTicketEditorDesign(){
+ if(!ticketEditorIsAdmin())return;
+ ticketEditorDesign=createDefaultTicketDesign();ticketEditorTemplateId="";ticketEditorSelectedId="";
+ $("ticketEditorName").value="";
+ $("ticketEditorCopyBtn").classList.add("hidden");$("ticketEditorDeleteBtn").classList.add("hidden");
+ renderTicketEditorControls();renderTicketEditorStage();renderTicketInspector();
+ say("ticketEditorMessage","Nueva plantilla en blanco lista para editar. Puede añadir, mover, redimensionar y eliminar elementos.");
+}
+function copyTicketEditorTemplate(){
+ if(!ticketEditorIsAdmin()||!ticketEditorDesign)return;
+ const currentName=$("ticketEditorName").value.trim()||"Plantilla";
+ ticketEditorTemplateId="";
+ $("ticketEditorName").value=(currentName+" · copia").slice(0,80);
+ $("ticketEditorCopyBtn").classList.add("hidden");$("ticketEditorDeleteBtn").classList.add("hidden");
+ say("ticketEditorMessage","Está editando una copia independiente. Al guardar se creará una nueva plantilla y se conservará la original.");
+}
+function renderTicketEditorControls(){
+ if(!ticketEditorDesign)return;
+ const d=ticketEditorDesign;
+ $("ticketCanvasWidth").value=d.widthMm;$("ticketCanvasHeight").value=d.heightMm;
+ $("ticketBackgroundType").value=d.backgroundType;$("ticketPattern").value=d.pattern;
+ $("ticketCanvasColor1").value=d.backgroundColor;$("ticketCanvasColor2").value=d.backgroundColor2;
+ $("ticketGradientAngle").value=d.gradientAngle;$("ticketCornerStyle").value=d.cornerStyle;
+ $("ticketCornerRadius").value=d.cornerRadiusMm;$("ticketBorderWidth").value=d.borderWidthMm;
+ $("ticketBorderColor").value=d.borderColor;
+ $("ticketBackgroundImageRemoveBtn").classList.toggle("hidden",!d.backgroundImage);
+ $("ticketGradientColorLabel").classList.toggle("hidden",d.backgroundType!=="gradient");
+ $("ticketGradientAngle").closest("label").classList.toggle("hidden",d.backgroundType!=="gradient");
+}
+function ticketEditorPreviewData(){
+ const reg=selectedRegistration($("ticketRegistration").value);
+ if(reg){try{return ticketDataForRegistration(reg);}catch{}}
+ const activity=selectedActivity($("ticketActivity").value)||activities[0]||{};
+ return {
+  attendeeName:"Nombre del participante",organization:"Organización",
+  eventName:activity.name||"Nombre del evento",eventDescription:activity.tagline||activity.description||"Descripción del evento",
+  date:activity.event_date?ticketDateLabel(activity.event_date):"Fecha del evento",
+  time:activity.start_time?ticketTime(activity.start_time):"Horario",
+  place:activity.place||"Lugar",row:"A",seat:"12",accessLabel:"ACCESO ÚNICO",
+  website:"www.espaciomejor.org",
+  logos:{institution:activity.institution_logo||"",project:activity.project_logo||"",partner:activity.partner_logo||""}
+ };
+}
+function scaleTicketEditorStage(){
+ const stage=$("ticketEditorStage"),root=stage?.querySelector(".ticket-custom");if(!stage||!root||!ticketEditorDesign)return;
+ const scale=stage.clientWidth/900;
+ root.style.transform="scale("+scale+")";
+}
+function renderTicketEditorStage(){
+ const stage=$("ticketEditorStage");if(!stage||!ticketEditorDesign)return;
+ stage.innerHTML="";
+ stage.style.aspectRatio=ticketEditorDesign.widthMm+"/"+ticketEditorDesign.heightMm;
+ const data=ticketEditorPreviewData();
+ const qrSrc=ticketQrDataUrl(selectedRegistration($("ticketRegistration").value)?.qr_token||"ESPACIO-ACREDITA");
+ const root=renderTicketDesign(ticketEditorDesign,data,{editor:true,selectedId:ticketEditorSelectedId,qrSrc});
+ root.style.position="absolute";root.style.left="0";root.style.top="0";root.style.transformOrigin="top left";
+ stage.appendChild(root);scaleTicketEditorStage();
+}
+function setTicketInspectorValue(id,value){const el=$(id);if(el)el.value=value??"";}
+function renderTicketInspector(){
+ const element=selectedTicketEditorElement();
+ $("ticketInspectorEmpty").classList.toggle("hidden",Boolean(element));
+ $("ticketInspectorFields").classList.toggle("hidden",!element);
+ if(!element)return;
+ const e=element;
+ setTicketInspectorValue("ticketPropX",e.x);setTicketInspectorValue("ticketPropY",e.y);
+ setTicketInspectorValue("ticketPropW",e.w);setTicketInspectorValue("ticketPropH",e.h);
+ const isText=e.type==="text",isField=e.type==="field";
+ $("ticketTextProps").classList.toggle("hidden",!isText&&!isField);
+ $("ticketPropTextLabel").classList.toggle("hidden",!isText);
+ $("ticketPropText").value=isText?e.text:"";
+ $("ticketPropFontSize").value=e.fontSize||24;$("ticketPropFontFamily").value=e.fontFamily||"Arial";
+ $("ticketPropFontWeight").value=e.fontWeight||"400";$("ticketPropColor").value=e.color||"#ffffff";
+ $("ticketPropAlign").value=e.align||"left";$("ticketPropVAlign").value=e.valign||"middle";
+ if(isField){
+  const label=ticketFieldLabels[e.field]||"Dato automático";
+  $("ticketInspectorEmpty").classList.add("hidden");
+  $("ticketPropText").value=label;$("ticketPropText").disabled=true;
+  $("ticketPropTextLabel").classList.remove("hidden");$("ticketPropTextLabel").firstChild.textContent="Campo automático";
+ }else{
+  $("ticketPropText").disabled=!ticketEditorIsAdmin();$("ticketPropTextLabel").firstChild.textContent="Texto libre";
+ }
+ const isLogo=e.type==="logo",isShape=e.type==="shape",isQr=e.type==="qr";
+ $("ticketLogoProps").classList.toggle("hidden",!isLogo);
+ $("ticketShapeProps").classList.toggle("hidden",!isShape);
+ $("ticketQrProps").classList.toggle("hidden",!isQr);
+ if(isLogo){
+  $("ticketPropLogoSource").value=e.source||"institution";
+  $("ticketPropLogoFit").value=e.fit||"contain";
+  $("ticketCustomLogoUploadLabel").classList.toggle("hidden",e.source!=="custom");
+ }
+ if(isShape){
+  $("ticketPropShape").value=e.shape||"rect";$("ticketPropFill").value=e.fill||"#83b6d0";
+  $("ticketPropStroke").value=e.stroke||"#ffffff";$("ticketPropStrokeWidth").value=e.strokeWidth||0;
+  $("ticketPropRadius").value=e.radius||0;
+ }
+ if(isQr){
+  $("ticketPropQrBackground").value=e.backgroundColor||"#ffffff";
+  $("ticketPropQrBorder").value=e.borderColor||"#ffffff";
+  $("ticketPropQrBorderWidth").value=e.borderWidth??1;$("ticketPropQrRadius").value=e.radius??3;
+ }
+}
+function updateTicketEditorGlobal(){
+ if(!ticketEditorDesign||!ticketEditorIsAdmin())return;
+ const d=ticketEditorDesign;
+ d.widthMm=Number($("ticketCanvasWidth").value)||d.widthMm;
+ d.heightMm=Number($("ticketCanvasHeight").value)||d.heightMm;
+ d.backgroundType=$("ticketBackgroundType").value;
+ d.pattern=$("ticketPattern").value;
+ d.backgroundColor=$("ticketCanvasColor1").value;
+ d.backgroundColor2=$("ticketCanvasColor2").value;
+ d.gradientAngle=Number($("ticketGradientAngle").value)||0;
+ d.cornerStyle=$("ticketCornerStyle").value;
+ d.cornerRadiusMm=Number($("ticketCornerRadius").value)||0;
+ d.borderWidthMm=Number($("ticketBorderWidth").value)||0;
+ d.borderColor=$("ticketBorderColor").value;
+ ticketEditorDesign=normalizeTicketDesign(d);
+ renderTicketEditorControls();renderTicketEditorStage();
+}
+function updateTicketEditorElement(){
+ if(!ticketEditorDesign||!ticketEditorIsAdmin())return;
+ const e=selectedTicketEditorElement();if(!e)return;
+ e.x=Number($("ticketPropX").value);e.y=Number($("ticketPropY").value);
+ e.w=Number($("ticketPropW").value);e.h=Number($("ticketPropH").value);
+ if(e.type==="text"||e.type==="field"){
+  e.fontSize=Number($("ticketPropFontSize").value);
+  e.fontFamily=$("ticketPropFontFamily").value;e.fontWeight=$("ticketPropFontWeight").value;
+  e.color=$("ticketPropColor").value;e.align=$("ticketPropAlign").value;e.valign=$("ticketPropVAlign").value;
+  if(e.type==="text")e.text=$("ticketPropText").value;
+ }
+ if(e.type==="logo"){e.source=$("ticketPropLogoSource").value;e.fit=$("ticketPropLogoFit").value;}
+ if(e.type==="shape"){
+  e.shape=$("ticketPropShape").value;e.fill=$("ticketPropFill").value;e.stroke=$("ticketPropStroke").value;
+  e.strokeWidth=Number($("ticketPropStrokeWidth").value);e.radius=Number($("ticketPropRadius").value);
+ }
+ if(e.type==="qr"){
+  e.backgroundColor=$("ticketPropQrBackground").value;e.borderColor=$("ticketPropQrBorder").value;
+  e.borderWidth=Number($("ticketPropQrBorderWidth").value);e.radius=Number($("ticketPropQrRadius").value);
+ }
+ ticketEditorDesign=normalizeTicketDesign(ticketEditorDesign);
+ renderTicketEditorStage();renderTicketInspector();
+}
+function addTicketEditorElement(){
+ if(!ticketEditorIsAdmin()||!ticketEditorDesign)return;
+ if(ticketEditorDesign.elements.length>=32){say("ticketEditorMessage","La plantilla admite un máximo de 32 elementos.",true);return;}
+ const value=$("ticketAddElement").value.split(":");
+ const kind=value[0],subtype=value[1]||"";
+ const logos=ticketEditorDesign.elements.filter(item=>item.type==="logo").length;
+ if(kind==="logo"&&logos>=8){say("ticketEditorMessage","La plantilla admite un máximo de 8 logotipos.",true);return;}
+ const base={id:crypto.randomUUID(),x:10,y:18,w:35,h:10,z:Math.max(0,...ticketEditorDesign.elements.map(item=>Number(item.z)||0))+1};
+ let item;
+ if(kind==="field")item={...base,type:"field",field:subtype,fontSize:24,fontFamily:"Arial",fontWeight:"700",color:"#ffffff",align:"left",valign:"middle"};
+ else if(kind==="text")item={...base,type:"text",text:"Escriba su texto",fontSize:24,fontFamily:"Arial",fontWeight:"600",color:"#ffffff",align:"left",valign:"middle"};
+ else if(kind==="logo")item={...base,type:"logo",source:subtype,fit:"contain",w:14,h:18,backgroundColor:"#ffffff"};
+ else if(kind==="qr")item={...base,type:"qr",w:18,h:28,backgroundColor:"#ffffff",borderColor:"#ffffff",borderWidth:1,radius:2};
+ else item={...base,type:"shape",shape:subtype||"rect",w:20,h:12,fill:"#83b6d0",stroke:"#ffffff",strokeWidth:0,radius:2};
+ ticketEditorDesign.elements.push(item);ticketEditorSelectedId=item.id;
+ renderTicketEditorStage();renderTicketInspector();
+ say("ticketEditorMessage","Elemento añadido al lienzo. Puede moverlo y ajustar su tamaño.");
+}
+function duplicateTicketEditorElement(){
+ const source=selectedTicketEditorElement();if(!source||!ticketEditorIsAdmin())return;
+ if(ticketEditorDesign.elements.length>=32){say("ticketEditorMessage","La plantilla admite un máximo de 32 elementos.",true);return;}
+ if(source.type==="logo"&&ticketEditorDesign.elements.filter(item=>item.type==="logo").length>=8){say("ticketEditorMessage","La plantilla admite un máximo de 8 logotipos.",true);return;}
+ const copy={...cloneTicketDesign(source),id:crypto.randomUUID(),x:Math.min(100-source.w,source.x+3),y:Math.min(100-source.h,source.y+3),z:Math.max(...ticketEditorDesign.elements.map(item=>Number(item.z)||0))+1};
+ ticketEditorDesign.elements.push(copy);ticketEditorSelectedId=copy.id;
+ renderTicketEditorStage();renderTicketInspector();
+}
+function deleteTicketEditorElement(){
+ if(!selectedTicketEditorElement()||!ticketEditorIsAdmin())return;
+ ticketEditorDesign.elements=ticketEditorDesign.elements.filter(item=>item.id!==ticketEditorSelectedId);
+ ticketEditorSelectedId="";renderTicketEditorStage();renderTicketInspector();
+}
+function ticketEditorPointerDown(ev){
+ if(!ticketEditorIsAdmin()||!ticketEditorDesign)return;
+ const stage=$("ticketEditorStage"),node=ev.target.closest("[data-design-id]");
+ if(!node){ticketEditorSelectedId="";ticketEditorDrag=null;renderTicketEditorStage();renderTicketInspector();return;}
+ const id=node.dataset.designId,e=ticketEditorDesign.elements.find(item=>item.id===id);if(!e)return;
+ ticketEditorSelectedId=id;
+ const rect=stage.getBoundingClientRect();
+ ticketEditorDrag={id,startX:ev.clientX,startY:ev.clientY,rectWidth:rect.width,rectHeight:rect.height,
+  x:e.x,y:e.y,w:e.w,h:e.h,resize:Boolean(ev.target.closest(".ticket-design-resize"))};
+ stage.setPointerCapture?.(ev.pointerId);
+ stage.querySelectorAll(".ticket-design-item.selected").forEach(item=>item.classList.remove("selected"));
+ node.classList.add("selected");
+ if(!node.querySelector(".ticket-design-resize")){
+  const handle=document.createElement("span");handle.className="ticket-design-resize";handle.setAttribute("aria-hidden","true");node.appendChild(handle);
+ }
+ renderTicketInspector();ev.preventDefault();
+}
+function ticketEditorPointerMove(ev){
+ if(!ticketEditorDrag||!ticketEditorIsAdmin())return;
+ const drag=ticketEditorDrag,e=ticketEditorDesign.elements.find(item=>item.id===drag.id);if(!e)return;
+ const dx=(ev.clientX-drag.startX)/Math.max(1,drag.rectWidth)*100;
+ const dy=(ev.clientY-drag.startY)/Math.max(1,drag.rectHeight)*100;
+ if(drag.resize){
+  e.w=Math.min(100-drag.x,Math.max(1,drag.w+dx));
+  e.h=Math.min(100-drag.y,Math.max(1,drag.h+dy));
+ }else{
+  e.x=Math.min(100-e.w,Math.max(0,drag.x+dx));
+  e.y=Math.min(100-e.h,Math.max(0,drag.y+dy));
+ }
+ const node=$("ticketEditorStage").querySelector('[data-design-id="'+drag.id+'"]');
+ if(node){node.style.left=e.x+"%";node.style.top=e.y+"%";node.style.width=e.w+"%";node.style.height=e.h+"%";}
+}
+function ticketEditorPointerUp(){
+ if(!ticketEditorDrag)return;
+ ticketEditorDrag=null;ticketEditorDesign=normalizeTicketDesign(ticketEditorDesign);
+ renderTicketEditorStage();renderTicketInspector();
+}
+async function saveTicketEditorTemplate(){
+ if(!ticketEditorIsAdmin()||!ticketEditorDesign){say("ticketEditorMessage","Solo el administrador puede guardar plantillas.",true);return;}
+ const name=$("ticketEditorName").value.trim();
+ if(name.length<2||name.length>80){say("ticketEditorMessage","El nombre de la plantilla debe tener entre 2 y 80 caracteres.",true);return;}
+ const design=normalizeTicketDesign(ticketEditorDesign);
+ const button=$("ticketEditorSaveBtn");button.disabled=true;button.textContent="Guardando…";
+ try{
+  let result;
+  if(ticketEditorTemplateId){
+   const response=await supabase.from("ticket_templates").update({name,design,updated_at:new Date().toISOString()})
+    .eq("id",ticketEditorTemplateId).eq("organization_id",currentProfile.organization_id)
+    .select("id,name,design,updated_at").single();
+   if(response.error)throw response.error;result=response.data;
+  }else{
+   const response=await supabase.from("ticket_templates").insert({
+    organization_id:currentProfile.organization_id,name,design,created_by:currentUser.id
+   }).select("id,name,design,updated_at").single();
+   if(response.error)throw response.error;result=response.data;
+  }
+  ticketEditorTemplateId=result.id;
+  ticketSettings.template="custom";ticketSettings.customTemplateId=result.id;
+  ticketSettings.customDesign=normalizeTicketDesign(result.design);ticketSettings.customTemplateName=result.name;
+  ticketEditorDesign=normalizeTicketDesign(result.design);
+  await loadTicketTemplates();
+  ticketSettings.template="custom";ticketSettings.customTemplateId=result.id;
+  ticketSettings.customDesign=normalizeTicketDesign(result.design);ticketSettings.customTemplateName=result.name;
+  saveTicketSettings();updateTicketDesignControls();renderTicketPreview();
+  $("ticketEditorDeleteBtn").classList.remove("hidden");$("ticketEditorCopyBtn").classList.remove("hidden");
+  say("ticketEditorMessage","Plantilla «"+result.name+"» guardada y disponible para su organización.");
+ }catch(error){
+  console.error("Error al guardar plantilla:",error);
+  say("ticketEditorMessage",error.message||"No se pudo guardar la plantilla. Revise los permisos y la migración de Supabase.",true);
+ }finally{button.disabled=false;button.textContent="Guardar plantilla";}
+}
+async function deleteTicketEditorTemplate(){
+ if(!ticketEditorIsAdmin()||!ticketEditorTemplateId)return;
+ const name=$("ticketEditorName").value.trim()||"esta plantilla";
+ if(!confirm("¿Eliminar la plantilla «"+name+"»? Esta acción no se puede deshacer."))return;
+ const {error}=await supabase.from("ticket_templates").delete().eq("id",ticketEditorTemplateId)
+  .eq("organization_id",currentProfile.organization_id);
+ if(error){say("ticketEditorMessage",error.message,true);return;}
+ ticketTemplates=ticketTemplates.filter(item=>item.id!==ticketEditorTemplateId);
+ ticketEditorTemplateId="";ticketEditorDesign=createDefaultTicketDesign();ticketEditorSelectedId="";
+ ticketSettings.template="classic";ticketSettings.customTemplateId=null;ticketSettings.customDesign=null;ticketSettings.customTemplateName="";
+ saveTicketSettings();refreshTicketTemplateOptions();renderTicketPreview();
+ $("ticketEditorName").value="";$("ticketEditorDeleteBtn").classList.add("hidden");
+ renderTicketEditorControls();renderTicketEditorStage();renderTicketInspector();
+ say("ticketEditorMessage","Plantilla eliminada.");
+}
+function handleTicketBackgroundUpload(ev){
+ const file=ev.target.files?.[0];if(!file||!ticketEditorDesign)return;
+ if(!["image/png","image/jpeg","image/webp"].includes(file.type)){say("ticketEditorMessage","Use una imagen PNG, JPG o WebP.",true);ev.target.value="";return;}
+ if(file.size>700*1024){say("ticketEditorMessage","La imagen de fondo debe pesar como máximo 700 KB. Optimícela antes de cargarla.",true);ev.target.value="";return;}
+ const reader=new FileReader();
+ reader.onload=()=>{
+  ticketEditorDesign.backgroundImage=String(reader.result||"");
+  ticketEditorDesign=normalizeTicketDesign(ticketEditorDesign);
+  renderTicketEditorControls();renderTicketEditorStage();
+  say("ticketEditorMessage","Imagen de fondo incorporada. Puede combinarla con patrones y elementos gráficos.");
+ };
+ reader.onerror=()=>say("ticketEditorMessage","No se pudo leer la imagen de fondo.",true);
+ reader.readAsDataURL(file);ev.target.value="";
+}
+function removeTicketBackgroundImage(){
+ if(!ticketEditorDesign||!ticketEditorIsAdmin())return;
+ ticketEditorDesign.backgroundImage="";
+ renderTicketEditorControls();renderTicketEditorStage();
+ say("ticketEditorMessage","Imagen de fondo eliminada. Se mostrará el color o degradado configurado.");
+}
+function handleTicketEditorLogoUpload(ev){
+ const file=ev.target.files?.[0],element=selectedTicketEditorElement();if(!file||!element||element.type!=="logo")return;
+ if(!["image/png","image/jpeg","image/webp"].includes(file.type)){say("ticketEditorMessage","Use una imagen PNG, JPG o WebP.",true);ev.target.value="";return;}
+ if(file.size>300*1024){say("ticketEditorMessage","El logo debe pesar como máximo 300 KB. Optimice la imagen antes de cargarla.",true);ev.target.value="";return;}
+ const reader=new FileReader();
+ reader.onload=()=>{
+  element.source="custom";element.src=String(reader.result||"");ticketEditorDesign=normalizeTicketDesign(ticketEditorDesign);
+  $("ticketPropLogoSource").value="custom";renderTicketEditorStage();renderTicketInspector();
+  say("ticketEditorMessage","Logo incorporado a la plantilla. Se guardará junto con el diseño.");
+ };
+ reader.onerror=()=>say("ticketEditorMessage","No se pudo leer la imagen seleccionada.",true);
+ reader.readAsDataURL(file);ev.target.value="";
+}
+function bindTicketEditorEvents(){
+ $("ticketOpenEditorBtn").addEventListener("click",openTicketEditor);
+ $("ticketEditorCloseBtn").addEventListener("click",closeTicketEditor);
+ $("ticketEditorNewBtn").addEventListener("click",newTicketEditorDesign);
+ $("ticketEditorCopyBtn").addEventListener("click",copyTicketEditorTemplate);
+ $("ticketEditorSaveBtn").addEventListener("click",saveTicketEditorTemplate);
+ $("ticketEditorDeleteBtn").addEventListener("click",deleteTicketEditorTemplate);
+ $("ticketAddElementBtn").addEventListener("click",addTicketEditorElement);
+ $("ticketDuplicateElementBtn").addEventListener("click",duplicateTicketEditorElement);
+ $("ticketDeleteElementBtn").addEventListener("click",deleteTicketEditorElement);
+ $("ticketCustomLogoUpload").addEventListener("change",handleTicketEditorLogoUpload);
+ $("ticketBackgroundImageUpload").addEventListener("change",handleTicketBackgroundUpload);
+ $("ticketBackgroundImageRemoveBtn").addEventListener("click",removeTicketBackgroundImage);
+ const globalLiveIds=["ticketBackgroundType","ticketPattern","ticketCanvasColor1","ticketCanvasColor2","ticketCornerStyle","ticketBorderColor"];
+ globalLiveIds.forEach(id=>{$(id).addEventListener("input",updateTicketEditorGlobal);$(id).addEventListener("change",updateTicketEditorGlobal);});
+ const globalNumberIds=["ticketCanvasWidth","ticketCanvasHeight","ticketGradientAngle","ticketCornerRadius","ticketBorderWidth"];
+ globalNumberIds.forEach(id=>$(id).addEventListener("change",updateTicketEditorGlobal));
+ const propertyLiveIds=["ticketPropText","ticketPropFontFamily","ticketPropFontWeight","ticketPropColor","ticketPropAlign","ticketPropVAlign","ticketPropLogoSource","ticketPropLogoFit","ticketPropShape","ticketPropFill","ticketPropStroke","ticketPropRadius","ticketPropQrBackground","ticketPropQrBorder","ticketPropQrRadius"];
+ propertyLiveIds.forEach(id=>{$(id).addEventListener("input",updateTicketEditorElement);$(id).addEventListener("change",updateTicketEditorElement);});
+ const propertyNumberIds=["ticketPropX","ticketPropY","ticketPropW","ticketPropH","ticketPropFontSize","ticketPropStrokeWidth","ticketPropQrBorderWidth"];
+ propertyNumberIds.forEach(id=>$(id).addEventListener("change",updateTicketEditorElement));
+ $("ticketEditorStage").addEventListener("pointerdown",ticketEditorPointerDown);
+ $("ticketEditorStage").addEventListener("pointermove",ticketEditorPointerMove);
+ $("ticketEditorStage").addEventListener("pointerup",ticketEditorPointerUp);
+ $("ticketEditorStage").addEventListener("pointercancel",ticketEditorPointerUp);
+ window.addEventListener("resize",scaleTicketEditorStage);
+}
+
 new ResizeObserver(resizeTicketPreview).observe($("ticketPreview"));
 function pdfWorker(root,scale=2){
+ const custom=root.dataset.ticketCustom==="true";
+ const vertical=root.classList.contains("ticket--vertical");
+ const pageWidth=custom?Number(root.dataset.pageWidthMm)+6:(vertical?96:303);
+ const pageHeight=custom?Number(root.dataset.pageHeightMm)+6:(vertical?156:104.08);
  return html2pdf().set({
   margin:3,
   image:{type:"jpeg",quality:.98},
@@ -426,7 +863,7 @@ function pdfWorker(root,scale=2){
     if(stage)Object.assign(stage.style,{left:"0px",top:"0px",opacity:"1",zIndex:"9999"});
    }
   },
-  jsPDF:{unit:"mm",format:root.classList.contains("ticket--vertical")?[96,156]:[303,104.08],orientation:root.classList.contains("ticket--vertical")?"portrait":"landscape"}
+  jsPDF:{unit:"mm",format:[pageWidth,pageHeight],orientation:pageWidth>=pageHeight?"landscape":"portrait"}
  }).from(root);
 }
 async function waitForTicketImages(root){
@@ -827,9 +1264,10 @@ async function afterLogin(){
  }
  currentProfile=data;ticketSettings=loadTicketSettings();updateTicketDesignControls();setSignedIn(true);
  if(isSuperadmin){await initSuperadmin(supabase,currentUser);switchTab("superadmin");return;}
- await loadAll();if(currentProfile.role==="admin")void loadMailSettings();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
+ await loadAll();await loadTicketTemplates();if(currentProfile.role==="admin")void loadMailSettings();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
 }
 $("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("createUserForm").addEventListener("submit",createManagedUser);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
+bindTicketEditorEvents();
 $("registrationFilter").addEventListener("change",()=>{selectedRegistrationIds.clear();renderRegistrations();say("bulkDeleteMessage","Selección reiniciada al cambiar el filtro.");});
 $("csvActivity").addEventListener("change",refreshCsvDuplicateWarnings);
 $("selectAllRegistrations").addEventListener("change",ev=>{
@@ -843,7 +1281,7 @@ $("registrationsTable").addEventListener("change",ev=>{
   renderRegistrations();
 });
 $("deleteSelectedBtn").addEventListener("click",deleteSelectedRegistrations);
-$("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("downloadSelectedTicketsBtn").addEventListener("click",downloadSelectedTicketsZip);$("exportRegistrationsBtn").addEventListener("click",()=>downloadRegistrationCsv("registered"));$("exportAccreditedBtn").addEventListener("click",()=>downloadRegistrationCsv("accredited"));$("ticketActivity").addEventListener("change",renderTicketRegistrationOptions);$("ticketRegistration").addEventListener("change",renderTicketPreview);$("ticketTemplate").addEventListener("change",selectTicketTemplate);$("ticketBackground").addEventListener("input",changeTicketColors);$("ticketAccent").addEventListener("input",changeTicketColors);$("ticketTextColor").addEventListener("input",changeTicketColors);$("ticketResetDesignBtn").addEventListener("click",resetTicketDesignColors);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
+$("deleteAllVisibleBtn").addEventListener("click",deleteAllVisibleRegistrations);$("downloadSelectedTicketsBtn").addEventListener("click",downloadSelectedTicketsZip);$("exportRegistrationsBtn").addEventListener("click",()=>downloadRegistrationCsv("registered"));$("exportAccreditedBtn").addEventListener("click",()=>downloadRegistrationCsv("accredited"));$("ticketRegistration").addEventListener("change",()=>{renderTicketPreview();if(!$("ticketEditorPanel").classList.contains("hidden"))renderTicketEditorStage();});$("ticketTemplate").addEventListener("change",selectTicketTemplate);$("ticketBackground").addEventListener("input",changeTicketColors);$("ticketAccent").addEventListener("input",changeTicketColors);$("ticketTextColor").addEventListener("input",changeTicketColors);$("ticketResetDesignBtn").addEventListener("click",resetTicketDesignColors);$("downloadOneBtn").addEventListener("click",downloadOne);$("downloadZipBtn").addEventListener("click",downloadZip);
 $("manualCheckinForm").addEventListener("submit",ev=>{ev.preventDefault();checkin(val("manualToken"));});$("startScannerBtn").addEventListener("click",startScanner);$("stopScannerBtn").addEventListener("click",stopScanner);
 document.addEventListener("click",ev=>{
  const t=ev.target.closest("[data-tab],[data-goto],[data-edit-activity],[data-toggle-activity],[data-ticket],[data-cancel],[data-delete],[data-save-role],[data-manual-accredit]");
@@ -864,7 +1302,7 @@ document.addEventListener("click",ev=>{
  if(t.dataset.manualAccredit)manualAccreditRegistration(t.dataset.manualAccredit);
 });
 for(const [input,key] of [["activityLogo","institution"],["projectLogo","project"],["partnerLogo","partner"]])$(input).addEventListener("change",async ev=>{const f=ev.target.files?.[0];if(!f)return;if(!f.type.startsWith("image/")){say("activityMessage","Selecciona un archivo de imagen.",true);return;}if(f.size>1_500_000){say("activityMessage","El logotipo supera 1,5 MB. Reduce su tamaño antes de subirlo.",true);return;}logoData[key]=await fileAsDataUrl(f);});
-$("ticketActivity").addEventListener("change",()=>{activityOptions("ticketActivity");renderTicketRegistrationOptions();});
+$("ticketActivity").addEventListener("change",()=>{activityOptions("ticketActivity");renderTicketRegistrationOptions();if(!$("ticketEditorPanel").classList.contains("hidden"))renderTicketEditorStage();});
 $("checkinActivity").addEventListener("change",renderManualCheckinList);
 $("manualCheckinSearch").addEventListener("input",renderManualCheckinList);
 $("adminTab").addEventListener("click",()=>{if(currentProfile?.role!=="admin")switchTab("dashboard");});

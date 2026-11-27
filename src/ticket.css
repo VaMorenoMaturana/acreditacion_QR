@@ -72,3 +72,51 @@
 #pdfStage .ticket--vertical{width:90mm;height:150mm;max-width:none;aspect-ratio:auto;box-shadow:none}
 .ticket-design-controls input[type="color"]{height:42px;min-height:42px;padding:4px;cursor:pointer}
 .ticket-design-controls .form-actions{align-self:end}
+
+/* Editor visual de plantillas personalizadas */
+.ticket-editor{margin-top:20px;padding-top:18px;border-top:1px solid #eee8f1}
+.ticket-editor-toolbar{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ticket-editor-toolbar>label{flex:1;min-width:220px}
+.ticket-editor-actions{display:flex;gap:7px;flex-wrap:wrap}
+.ticket-editor-actions button{font-size:12px;padding:8px 10px}
+.ticket-editor-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px;align-items:start;margin-top:14px}
+.ticket-editor-workspace{min-width:0}
+.ticket-editor-stage-wrap{padding:14px;background:#f0edf3;border:1px solid #ded7e4;border-radius:12px;overflow:hidden}
+.ticket-editor-stage{position:relative;width:100%;max-width:900px;margin:0 auto;aspect-ratio:200/124;overflow:hidden;background:#fff;touch-action:none;box-shadow:0 8px 24px #24132a20}
+.ticket-editor-stage>.ticket{position:absolute;left:0;top:0;transform-origin:top left;box-shadow:none}
+.ticket-editor-stage .ticket-design-item{cursor:move;user-select:none}
+.ticket-editor-stage .ticket-design-item.selected{outline:2px dashed #ffb000;outline-offset:1px;overflow:visible}
+.ticket-editor-stage .ticket-design-item.selected>*{pointer-events:none}
+.ticket-design-resize{position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;border:2px solid #fff;border-radius:3px;background:#35105c;box-shadow:0 1px 4px #0007;cursor:nwse-resize;z-index:9999;pointer-events:auto!important}
+.ticket-editor-addbar{display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:12px 0}
+.ticket-editor-addbar label{min-width:240px;flex:0 1 360px}
+.ticket-editor-addbar .muted{flex:1 1 220px;font-size:11px}
+.ticket-editor-inspector{min-width:0;border:1px solid #e4dde8;border-radius:12px;background:#fbfafc;overflow:hidden}
+.ticket-editor-section{padding:13px;border-bottom:1px solid #e8e2ec}
+.ticket-editor-section:last-child{border-bottom:0}
+.ticket-editor-section h3{font-size:13px;margin:0 0 11px;color:#352542}
+.ticket-editor-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.ticket-editor-fields label,.ticket-editor-subsection label{font-size:11px;gap:4px}
+.ticket-editor-fields input,.ticket-editor-fields select,.ticket-editor-subsection input,.ticket-editor-subsection select,.ticket-editor-subsection textarea{font-size:12px;padding:7px 8px}
+.ticket-editor-fields input[type=color],.ticket-editor-subsection input[type=color]{height:34px;min-height:34px;padding:3px}
+.ticket-editor-subsection{margin-top:12px;padding-top:11px;border-top:1px solid #e8e2ec}
+.ticket-editor-subsection>label{margin-bottom:9px}
+.ticket-position-fields{margin-bottom:10px}
+.ticket-editor-section .ticket-editor-actions{margin-top:12px}
+.ticket-quick-colors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end}
+.ticket-quick-colors input[type=color]{height:42px;min-height:42px;padding:4px}
+.ticket-custom{font-family:Arial,sans-serif;max-width:none;aspect-ratio:auto;container-type:normal}
+.ticket-custom .ticket-design-item{margin:0}
+.ticket-custom .ticket-design-item img{max-width:none}
+.ticket-custom .ticket-design-item div{min-width:0}
+@media(max-width:900px){
+ .ticket-editor-layout{grid-template-columns:1fr}
+ .ticket-editor-inspector{display:grid;grid-template-columns:1fr 1fr}
+ .ticket-editor-section{border-right:1px solid #e8e2ec}
+}
+@media(max-width:600px){
+ .ticket-editor-inspector{display:block}
+ .ticket-editor-section{border-right:0}
+ .ticket-quick-colors{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ticket-editor-stage-wrap{padding:6px}
+}
