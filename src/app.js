@@ -518,7 +518,10 @@ function openTicketEditor(){
  $("ticketEditorNewBtn").classList.toggle("hidden",!ticketEditorIsAdmin());
  $("ticketEditorSaveBtn").classList.toggle("hidden",!ticketEditorIsAdmin());
  $("ticketEditorDeleteBtn").classList.toggle("hidden",!ticketEditorIsAdmin()||!ticketEditorTemplateId);
- $("ticketEditorStage").classList.toggle("ticket-editor-readonly",!ticketEditorIsAdmin());
+ const readOnly=!ticketEditorIsAdmin();
+ document.querySelectorAll("#ticketEditorPanel input,#ticketEditorPanel select,#ticketEditorPanel textarea").forEach(control=>{control.disabled=readOnly;});
+ document.querySelectorAll("#ticketEditorPanel button").forEach(button=>{button.disabled=readOnly&&button.id!=="ticketEditorCloseBtn";});
+ $("ticketEditorStage").classList.toggle("ticket-editor-readonly",readOnly);
  renderTicketEditorControls();renderTicketEditorStage();renderTicketInspector();
  if(!ticketEditorIsAdmin())say("ticketEditorMessage","Vista de solo lectura. Solo el administrador puede crear, modificar o eliminar las plantillas de la organización.");
  else say("ticketEditorMessage",ticketEditorTemplateId?"Edite los elementos y guarde los cambios de esta plantilla.":"Diseñe una nueva plantilla y guárdela para reutilizarla.");
