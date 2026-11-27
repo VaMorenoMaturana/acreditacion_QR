@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@^2";
 import { corsHeaders } from "npm:@supabase/supabase-js@^2/cors";
 import nodemailer from "npm:nodemailer@^9";
+import { Buffer } from "node:buffer";
 
 type MailConfig = {
   host: string;
@@ -313,7 +314,7 @@ Deno.serve(async (req: Request) => {
           subject, text, html,
           attachments: [{
             filename: `entrada-${safeFilePart(replacements.nombre)}.pdf`,
-            content: pdfBytes,
+            content: Buffer.from(pdfBytes),
             contentType: "application/pdf",
           }],
         });
