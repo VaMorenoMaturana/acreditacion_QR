@@ -541,6 +541,7 @@ function renderTicketEditorControls(){
  $("ticketGradientAngle").value=d.gradientAngle;$("ticketCornerStyle").value=d.cornerStyle;
  $("ticketCornerRadius").value=d.cornerRadiusMm;$("ticketBorderWidth").value=d.borderWidthMm;
  $("ticketBorderColor").value=d.borderColor;
+ $("ticketBackgroundImageRemoveBtn").classList.toggle("hidden",!d.backgroundImage);
  $("ticketGradientColorLabel").classList.toggle("hidden",d.backgroundType!=="gradient");
  $("ticketGradientAngle").closest("label").classList.toggle("hidden",d.backgroundType!=="gradient");
 }
@@ -774,6 +775,26 @@ async function deleteTicketEditorTemplate(){
  renderTicketEditorControls();renderTicketEditorStage();renderTicketInspector();
  say("ticketEditorMessage","Plantilla eliminada.");
 }
+function handleTicketBackgroundUpload(ev){
+ const file=ev.target.files?.[0];if(!file||!ticketEditorDesign)return;
+ if(!["image/png","image/jpeg","image/webp"].includes(file.type)){say("ticketEditorMessage","Use una imagen PNG, JPG o WebP.",true);ev.target.value="";return;}
+ if(file.size>700*1024){say("ticketEditorMessage","La imagen de fondo debe pesar como máximo 700 KB. Optimícela antes de cargarla.",true);ev.target.value="";return;}
+ const reader=new FileReader();
+ reader.onload=()=>{
+  ticketEditorDesign.backgroundImage=String(reader.result||"");
+  ticketEditorDesign=normalizeTicketDesign(ticketEditorDesign);
+  renderTicketEditorControls();renderTicketEditorStage();
+  say("ticketEditorMessage","Imagen de fondo incorporada. Puede combinarla con patrones y elementos gráficos.");
+ };
+ reader.onerror=()=>say("ticketEditorMessage","No se pudo leer la imagen de fondo.",true);
+ reader.readAsDataURL(file);ev.target.value="";
+}
+function removeTicketBackgroundImage(){
+ if(!ticketEditorDesign||!ticketEditorIsAdmin())return;
+ ticketEditorDesign.backgroundImage="";
+ renderTicketEditorControls();renderTicketEditorStage();
+ say("ticketEditorMessage","Imagen de fondo eliminada. Se mostrará el color o degradado configurado.");
+}
 function handleTicketEditorLogoUpload(ev){
  const file=ev.target.files?.[0],element=selectedTicketEditorElement();if(!file||!element||element.type!=="logo")return;
  if(!["image/png","image/jpeg","image/webp"].includes(file.type)){say("ticketEditorMessage","Use una imagen PNG, JPG o WebP.",true);ev.target.value="";return;}
@@ -797,6 +818,8 @@ function bindTicketEditorEvents(){
  $("ticketDuplicateElementBtn").addEventListener("click",duplicateTicketEditorElement);
  $("ticketDeleteElementBtn").addEventListener("click",deleteTicketEditorElement);
  $("ticketCustomLogoUpload").addEventListener("change",handleTicketEditorLogoUpload);
+ $("ticketBackgroundImageUpload").addEventListener("change",handleTicketBackgroundUpload);
+ $("ticketBackgroundImageRemoveBtn").addEventListener("click",removeTicketBackgroundImage);
  for(const id of ["ticketCanvasWidth","ticketCanvasHeight","ticketBackgroundType","ticketPattern","ticketCanvasColor1","ticketCanvasColor2","ticketGradientAngle","ticketCornerStyle","ticketCornerRadius","ticketBorderWidth","ticketBorderColor"]){
   $(id).addEventListener("input",updateTicketEditorGlobal);$(id).addEventListener("change",updateTicketEditorGlobal);
  }
