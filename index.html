@@ -215,11 +215,11 @@
     <div class="panel"><h2>Configuración de correo SMTP</h2>
       <p class="muted">La configuración pertenece exclusivamente a su organización. La contraseña SMTP se cifra en el servidor y nunca vuelve a mostrarse en el navegador.</p>
       <form id="mailSettingsForm" class="form-grid">
-        <label class="span-2">Servidor SMTP (host) *<input id="mailSmtpHost" required maxlength="253" placeholder="email-smtp.us-east-1.amazonaws.com"></label>
+        <label class="span-2">Servidor SMTP (host) *<input id="mailSmtpHost" required maxlength="253" placeholder="smtp.gmail.com (Gmail) o el host de su proveedor"></label>
         <label>Puerto SMTP *<input id="mailSmtpPort" type="number" min="1" max="65535" value="2587" required></label>
         <label>Seguridad de conexión<select id="mailSmtpSecurity"><option value="starttls">STARTTLS (recomendado)</option><option value="tls">TLS directo</option></select></label>
         <label>Usuario SMTP *<input id="mailSmtpUsername" required maxlength="254" autocomplete="username"></label>
-        <label>Contraseña SMTP *<input id="mailSmtpPassword" type="password" maxlength="512" autocomplete="new-password" placeholder="Ingrese la contraseña SMTP"></label>
+        <label>Contraseña SMTP *<input id="mailSmtpPassword" type="password" maxlength="512" autocomplete="new-password" placeholder="Clave de aplicación de Google (16 caracteres)"></label>
         <label>Correo remitente *<input id="mailSenderEmail" type="email" required maxlength="254" placeholder="entradas@su-dominio.cl"></label>
         <label>Nombre del remitente *<input id="mailSenderName" required maxlength="120" value="Espacio Acredita"></label>
         <div class="form-actions span-2"><button id="mailSaveSettingsBtn" class="primary" type="submit">Guardar configuración SMTP</button><button id="mailTestConnectionBtn" class="secondary" type="button">Probar conexión</button></div>
@@ -237,6 +237,7 @@
         <p><strong>Importante sobre los puertos:</strong> Supabase documenta restricciones de conexiones SMTP salientes por los puertos 25 y 587. Solicite a su proveedor un puerto alternativo habilitado; suelen utilizarse 2587 o 2525. El puerto 465 suele utilizar TLS directo y no figura entre las restricciones documentadas; si lo utiliza, seleccione «TLS directo». Confirme su disponibilidad con el proveedor y el entorno.</p>
         <p>Ejemplo orientativo: AWS SES ofrece el puerto 2587 con STARTTLS. Utilice los datos propios de su cuenta y región.</p>
         <p>Si el proveedor solo ofrece SMTP en los puertos restringidos, esta conexión directa no funcionará desde Supabase; utilice un proveedor con puerto alternativo o una integración de envío mediante API.</p>
+        <p><strong>Para Gmail:</strong> use el host <code>smtp.gmail.com</code>, puerto <code>465</code> y seguridad <code>TLS directo</code>. El usuario y el correo remitente deben ser su dirección Gmail completa. Para autenticarse, use una contraseña de aplicación de Google, no la contraseña normal de su cuenta; Google exige tener activada la verificación en dos pasos para crearla. <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">Crear una contraseña de aplicación</a>.</p>
         <p><strong>Clave de cifrado:</strong> agregue una cadena aleatoria de al menos 32 caracteres llamada <code>MAIL_SETTINGS_ENCRYPTION_KEY</code> en Supabase → Edge Functions → Secrets. Esta clave cifra las contraseñas SMTP guardadas por cada organización; no es la contraseña SMTP del remitente.</p>
       </div>
     </div>

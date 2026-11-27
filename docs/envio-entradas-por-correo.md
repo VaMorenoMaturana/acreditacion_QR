@@ -50,3 +50,16 @@ Si su proveedor solo ofrece los puertos restringidos, esta conexión SMTP direct
 ## Interpretación del resultado
 
 El estado «Enviada» significa que el servidor SMTP aceptó el mensaje y devolvió una respuesta satisfactoria. No garantiza que el mensaje haya llegado a la bandeja de entrada: el proveedor puede generar rebotes, aplicar filtros antispam o rechazar el dominio remitente posteriormente. Verifique SPF, DKIM y DMARC en el dominio del remitente y supervise los rebotes desde el proveedor.
+
+
+## Parámetros para Gmail
+
+- Host: `smtp.gmail.com`
+- Puerto: `465`
+- Seguridad: TLS directo
+- Usuario SMTP: dirección Gmail completa
+- Correo remitente: la misma dirección Gmail autenticada (o un remitente/alias autorizado por la cuenta)
+- Nombre remitente: `Espacio Acredita`
+- Contraseña SMTP: contraseña de aplicación de Google de 16 caracteres, no la contraseña habitual de la cuenta. Google exige tener activada la verificación en dos pasos para crear contraseñas de aplicación.
+
+El host es solo el nombre DNS `smtp.gmail.com`: no escriba `https://`, `://` ni una URL con rutas.
