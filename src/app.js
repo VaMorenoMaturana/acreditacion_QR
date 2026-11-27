@@ -620,7 +620,14 @@ async function sendMailEntries(){
     const attachment=await blobToBase64(pdfBlob);
     await callMailManager("send_one",{registration_id:reg.id,subject:subject,body:body,attachment_base64:attachment});
     sent++;mailLogsByRegistration.set(reg.id,{registration_id:reg.id,status:"sent",recipient_email:reg.attendee.email});
-   }catch(error){failed++;failures.push((reg.attendee?.full_name||"Participante")+": "+error.message);}
+   }catch(error){
+    failed++;failures.push((reg.attendee?.full_name||"Participante")+": "+error.message);
+    if(/connection|connect|timeout|socket|enotfound|econn|tls|authentication/i.test(error.message)){
+     setMailConnectionStatus("disconnected","Conexión SMTP interrumpida durante el envío");
+     failures.push("El servicio de correo se marcó como desconectado y el envío se detuvo.");
+     break;
+    }
+   }
    $("mailProgressMessage").textContent="Envío en curso: "+(index+1)+"/"+recipients.length+" · "+sent+" enviados · "+failed+" fallidos";
   }
  }finally{
@@ -630,7 +637,7 @@ async function sendMailEntries(){
  say("mailProgressMessage","Proceso finalizado: "+sent+" enviados correctamente y "+failed+" fallidos.",failed>0);
  $("mailResults").innerHTML=failures.length
   ?"<strong>Detalles para revisar</strong><ul>"+failures.slice(0,20).map(item=>"<li>"+escapeHtml(item)+"</li>").join("")+"</ul>"
-  :"Todos los destinatarios recibieron una respuesta correcta del servidor SMTP.";
+  :"El servidor SMTP aceptó todos los mensajes para su procesamiento. La entrega final depende del proveedor y del servidor de correo del destinatario.";
 }
 function parseQr(decoded){const raw=String(decoded||"").trim();const prefixes=["ESPACIO-ACREDITA:","EA:"];for(const p of prefixes)if(raw.startsWith(p))return raw.slice(p.length);return raw;}
 
