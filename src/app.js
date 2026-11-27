@@ -71,8 +71,10 @@ function loadTicketSettings(){
  }catch(error){console.warn("No se pudieron leer los ajustes de entradas:",error);return defaults;}
 }
 function saveTicketSettings(){
- try{localStorage.setItem(ticketSettingsKey(),JSON.stringify(ticketSettings));}
- catch(error){console.warn("No se pudieron guardar los ajustes de entradas:",error);}
+ try{
+  const persisted={template:ticketSettings.template,customTemplateId:ticketSettings.customTemplateId,colors:ticketSettings.colors};
+  localStorage.setItem(ticketSettingsKey(),JSON.stringify(persisted));
+ }catch(error){console.warn("No se pudieron guardar los ajustes de entradas:",error);}
 }
 function updateTicketDesignControls(){
  const format=$("ticketTemplate");if(!format)return;
@@ -393,8 +395,37 @@ async function importCsv(){
  await loadAll();refreshCsvDuplicateWarnings();
  say("csvMessage",'Importadas '+ok+' filas'+(duplicateImported?' (incluidas '+duplicateImported+' con correo repetido)':'')+'.'+(failed.length?' Errores: '+failed.slice(0,5).join(" | "):''),failed.length>0);
 }
+function ticketDataForRegistration(reg){
+ const a=selectedActivity(reg.activity_id);if(!a)throw new Error("No se encontró la actividad de esta inscripción.");
+ const start=ticketTime(a.start_time),end=ticketTime(a.end_time);
+ return {
+  attendeeName:reg.attendee?.full_name||"Participante",
+  organization:reg.attendee?.organization||"",
+  eventName:a.name||"Evento",
+  eventDescription:a.tagline||a.description||"",
+  date:ticketDateLabel(a.event_date),
+  time:start?`${start}${end?"–"+end:""}`:"Por definir",
+  place:a.place||"",
+  row:reg.seat_row||"",
+  seat:reg.seat_number||"",
+  accessLabel:"ACCESO ÚNICO",
+  website:"www.espaciomejor.org",
+  logos:{institution:a.institution_logo||"",project:a.project_logo||"",partner:a.partner_logo||""}
+ };
+}
+function ticketQrDataUrl(token){
+ const qrHolder=document.createElement("div");qrHolder.style.cssText="position:absolute;left:-99999px;top:0";
+ document.body.appendChild(qrHolder);
+ new QRCode(qrHolder,{text:token||"ESPACIO-ACREDITA",width:320,height:320,colorDark:"#17151c",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+ const canvas=qrHolder.querySelector("canvas"),image=canvas?canvas.toDataURL("image/png"):"";
+ qrHolder.remove();return image;
+}
 function ticketDocument(reg,design=ticketSettings){
  const a=selectedActivity(reg.activity_id);if(!a)throw new Error("No se encontró la actividad de esta inscripción.");
+ const data=ticketDataForRegistration(reg);
+ if(design.template==="custom"&&design.customDesign){
+  return renderTicketDesign(design.customDesign,data,{print:true,qrSrc:ticketQrDataUrl(reg.qr_token)});
+ }
  const format=design.template==="vertical"?"vertical":"classic";
  const markup=format==="vertical"?ticketMarkupVertical:ticketMarkup;
  const host=document.createElement("div");
@@ -405,20 +436,16 @@ function ticketDocument(reg,design=ticketSettings){
  root.style.setProperty("--ticket-accent",safeTicketColor(colors.accent,TICKET_DEFAULT_COLORS[format].accent));
  root.style.setProperty("--ticket-text",safeTicketColor(colors.text,TICKET_DEFAULT_COLORS[format].text));
  const set=(id,text)=>{const el=root.querySelector("#"+id);if(el)el.textContent=text||"";};
- set("previewPerson",reg.attendee.full_name);set("previewOrg",reg.attendee.organization||"");
- set("previewEventName",a.name);set("previewEventDesc",a.tagline||a.description||"");
- const start=ticketTime(a.start_time),end=ticketTime(a.end_time);
- set("previewDate",ticketDateLabel(a.event_date));set("previewTime",start?`${start}${end?"–"+end:""}`:"Por definir");set("previewPlace",a.place);
+ set("previewPerson",data.attendeeName);set("previewOrg",data.organization);
+ set("previewEventName",data.eventName);set("previewEventDesc",data.eventDescription);
+ set("previewDate",data.date);set("previewTime",data.time);set("previewPlace",data.place);
  const seatLabels=root.querySelectorAll(".seat div");
- if(seatLabels[0])seatLabels[0].textContent=`FILA: ${reg.seat_row||"-"}`;
- if(seatLabels[1])seatLabels[1].textContent=`ASIENTO: ${reg.seat_number||"-"}`;
+ if(seatLabels[0])seatLabels[0].textContent="FILA: "+(data.row||"-");
+ if(seatLabels[1])seatLabels[1].textContent="ASIENTO: "+(data.seat||"-");
  const imgs=[["logoPreview",a.institution_logo],["projectLogoPreview",a.project_logo],["partnerLogoPreview",a.partner_logo]];
  imgs.forEach(([id,src])=>{const img=root.querySelector("#"+id);if(src){img.src=src;img.hidden=false;img.style.display="block";}else if(img)img.remove();});
  const qr=root.querySelector("#qrPreview");qr.removeAttribute("src");qr.alt="Código QR";
- const qrHolder=document.createElement("div");qrHolder.style.cssText="position:absolute;left:-99999px;top:0";
- document.body.appendChild(qrHolder);
- new QRCode(qrHolder,{text:reg.qr_token,width:320,height:320,colorDark:"#17151c",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
- const canvas=qrHolder.querySelector("canvas");if(canvas)qr.src=canvas.toDataURL("image/png");qrHolder.remove();
+ qr.src=ticketQrDataUrl(reg.qr_token);
  return root;
 }
 function resizeTicketPreview(){
