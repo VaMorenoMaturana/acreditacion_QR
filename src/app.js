@@ -634,7 +634,8 @@ async function sendMailEntries(){
   mailSending=false;renderMailRecipients();button.disabled=!mailConnected||!mailEligibleRecipients().length;
  }
  await loadMailDeliveryLogs();
- say("mailProgressMessage","Proceso finalizado: "+sent+" enviados correctamente y "+failed+" fallidos.",failed>0);
+ const notAttempted=Math.max(0,recipients.length-sent-failed);
+ say("mailProgressMessage","Proceso finalizado: "+sent+" aceptados por SMTP · "+failed+" fallidos · "+notAttempted+" no procesados.",failed>0||notAttempted>0);
  $("mailResults").innerHTML=failures.length
   ?"<strong>Detalles para revisar</strong><ul>"+failures.slice(0,20).map(item=>"<li>"+escapeHtml(item)+"</li>").join("")+"</ul>"
   :"El servidor SMTP aceptó todos los mensajes para su procesamiento. La entrega final depende del proveedor y del servidor de correo del destinatario.";
