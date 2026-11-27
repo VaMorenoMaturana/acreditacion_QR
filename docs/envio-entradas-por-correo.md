@@ -45,3 +45,8 @@ Si su proveedor solo ofrece los puertos restringidos, esta conexión SMTP direct
 - La función valida la sesión, exige rol administrador, verifica la organización del registro y obtiene el destinatario desde la base de datos.
 - El adjunto debe ser un PDF y no puede superar 3 MB.
 - El servidor procesa un correo por solicitud. El frontend procesa destinatarios de forma secuencial y permite continuar aunque un envío individual falle.
+
+
+## Interpretación del resultado
+
+El estado «Enviada» significa que el servidor SMTP aceptó el mensaje y devolvió una respuesta satisfactoria. No garantiza que el mensaje haya llegado a la bandeja de entrada: el proveedor puede generar rebotes, aplicar filtros antispam o rechazar el dominio remitente posteriormente. Verifique SPF, DKIM y DMARC en el dominio del remitente y supervise los rebotes desde el proveedor.
