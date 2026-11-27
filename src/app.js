@@ -521,7 +521,7 @@ async function loadMailSettings(){
   const result=await callMailManager("get_settings"),settings=result.settings;mailSettingsMeta=settings;
   $("mailSmtpHost").value=settings.host||"";$("mailSmtpPort").value=settings.port||2587;
   $("mailSmtpSecurity").value=settings.security||"starttls";$("mailSmtpUsername").value=settings.username||"";
-  $("mailSenderEmail").value=settings.senderEmail||"";$("mailSenderName").value=settings.senderName||"";
+  $("mailSenderEmail").value=settings.senderEmail||"";$("mailSenderName").value=settings.senderName||"Espacio Acredita";
   $("mailSmtpPassword").value="";$("mailSmtpPassword").placeholder=settings.hasPassword?"Configurada; deje vacío para conservarla":"Ingrese la contraseña SMTP";
   await refreshMailConnection(settings);
  }catch(error){setMailConnectionStatus("disconnected","No se pudo consultar la configuración SMTP");say("mailSettingsMessage",error.message,true);}
