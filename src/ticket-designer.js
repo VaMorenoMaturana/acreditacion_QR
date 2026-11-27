@@ -64,6 +64,7 @@ export function normalizeTicketDesign(value) {
     backgroundType: ["solid", "gradient"].includes(source.backgroundType) ? source.backgroundType : "solid",
     backgroundColor: validColor(source.backgroundColor, base.backgroundColor),
     backgroundColor2: validColor(source.backgroundColor2, base.backgroundColor2),
+    backgroundImage: typeof source.backgroundImage === "string" && /^data:image\/(png|jpeg|webp);base64,/i.test(source.backgroundImage) ? source.backgroundImage.slice(0, 1000000) : "",
     gradientAngle: clamp(source.gradientAngle, 0, 360, 120),
     pattern: ["none", "grid", "dots", "diagonal"].includes(source.pattern) ? source.pattern : "none",
     cornerStyle: ["square", "rounded", "ticket"].includes(source.cornerStyle) ? source.cornerStyle : "rounded",
@@ -146,9 +147,13 @@ export function renderTicketDesign(value, data = {}, options = {}) {
   root.style.overflow = "hidden";
   root.style.boxSizing = "border-box";
   root.style.isolation = "isolate";
-  root.style.background = design.backgroundType === "gradient"
-    ? "linear-gradient(" + design.gradientAngle + "deg," + design.backgroundColor + "," + design.backgroundColor2 + ")"
-    : design.backgroundColor;
+  root.style.backgroundColor = design.backgroundColor;
+  root.style.backgroundImage = design.backgroundImage
+    ? `url("${design.backgroundImage}")`
+    : (design.backgroundType === "gradient" ? "linear-gradient(" + design.gradientAngle + "deg," + design.backgroundColor + "," + design.backgroundColor2 + ")" : "none");
+  root.style.backgroundSize = "cover";
+  root.style.backgroundPosition = "center";
+  root.style.backgroundRepeat = "no-repeat";
   root.style.border = design.borderWidthMm + (print ? "mm " : "px ") + "solid " + design.borderColor;
   root.style.borderRadius = design.cornerStyle === "rounded"
     ? design.cornerRadiusMm + (print ? "mm" : "px")
