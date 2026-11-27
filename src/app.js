@@ -607,7 +607,7 @@ function renderTicketInspector(){
   $("ticketPropText").value=label;$("ticketPropText").disabled=true;
   $("ticketPropTextLabel").classList.remove("hidden");$("ticketPropTextLabel").firstChild.textContent="Campo automático";
  }else{
-  $("ticketPropText").disabled=false;$("ticketPropTextLabel").firstChild.textContent="Texto libre";
+  $("ticketPropText").disabled=!ticketEditorIsAdmin();$("ticketPropTextLabel").firstChild.textContent="Texto libre";
  }
  const isLogo=e.type==="logo",isShape=e.type==="shape",isQr=e.type==="qr";
  $("ticketLogoProps").classList.toggle("hidden",!isLogo);
