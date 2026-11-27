@@ -247,6 +247,7 @@
     <div class="page-head"><div><h1>Control global de Espacio Acredita</h1><p class="muted">Consola reservada al superadministrador de la plataforma. Las organizaciones mantienen sus datos aislados entre sí.</p></div></div>
     <div class="admin-subnav">
       <button type="button" data-super-view="overview" class="active">Resumen</button>
+      <button type="button" data-super-view="account">Mi cuenta</button>
       <button type="button" data-super-view="organizations">Organizaciones</button>
       <button type="button" data-super-view="users">Usuarios y perfiles</button>
       <button type="button" data-super-view="activities">Eventos</button>
@@ -264,6 +265,29 @@
         <article class="stat"><span>Acreditaciones</span><strong id="superCountCheckins">—</strong></article>
       </div>
       <div class="panel"><div class="page-head"><div><h2>Estado de la plataforma</h2><p class="muted">Indicadores globales y actividad de todas las organizaciones.</p></div><button type="button" class="secondary" id="superRefreshBtn">Actualizar datos</button></div><div id="superOverviewNote" class="message" role="status"></div></div>
+    </section>
+    <section id="super-view-account" class="super-view hidden">
+      <div class="panel">
+        <h2>Cambiar mi contraseña</h2>
+        <p class="muted">Cuenta autenticada: <strong id="superAccountEmail">—</strong></p>
+        <p class="muted">Esta opción modifica únicamente la contraseña de su propia cuenta de superadministrador. Se verificará su contraseña actual antes de guardar el cambio.</p>
+        <form id="superAccountPasswordForm" class="form-grid">
+          <label class="span-2">Contraseña actual
+            <input id="superAccountCurrentPassword" type="password" minlength="1" maxlength="128" autocomplete="current-password" required>
+          </label>
+          <label>Nueva contraseña
+            <input id="superAccountNewPassword" type="password" minlength="14" maxlength="128" autocomplete="new-password" required placeholder="Mínimo 14 caracteres">
+          </label>
+          <label>Confirmar nueva contraseña
+            <input id="superAccountConfirmPassword" type="password" minlength="14" maxlength="128" autocomplete="new-password" required>
+          </label>
+          <div class="form-actions">
+            <button class="primary" type="submit" id="superAccountPasswordSaveBtn">Actualizar contraseña</button>
+          </div>
+        </form>
+        <p id="superAccountPasswordMessage" class="message" role="status"></p>
+        <p class="muted">Recomendación: utilice una contraseña única, generada y almacenada en un gestor de contraseñas. No la reutilice en otros servicios.</p>
+      </div>
     </section>
     <section id="super-view-organizations" class="super-view hidden">
       <div class="panel"><h2>Crear o modificar organización</h2>
