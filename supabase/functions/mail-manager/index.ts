@@ -94,7 +94,7 @@ function parseConfig(value: unknown): MailConfig {
   }
   if (!username) throw new Error("Ingrese el usuario SMTP.");
   if (!validEmail(senderEmail)) throw new Error("Ingrese un correo remitente válido.");
-  if (!senderName || /[\\r\\n]/.test(senderName)) throw new Error("Ingrese un nombre remitente válido, sin saltos de línea.");
+  if (!senderName || /[\r\n]/.test(senderName)) throw new Error("Ingrese un nombre remitente válido, sin saltos de línea.");
   return { host, port, security, username, senderEmail, senderName };
 }
 function createTransport(config: MailConfig, password: string) {
