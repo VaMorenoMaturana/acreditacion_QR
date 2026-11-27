@@ -822,11 +822,14 @@ function bindTicketEditorEvents(){
  $("ticketCustomLogoUpload").addEventListener("change",handleTicketEditorLogoUpload);
  $("ticketBackgroundImageUpload").addEventListener("change",handleTicketBackgroundUpload);
  $("ticketBackgroundImageRemoveBtn").addEventListener("click",removeTicketBackgroundImage);
- for(const id of ["ticketCanvasWidth","ticketCanvasHeight","ticketBackgroundType","ticketPattern","ticketCanvasColor1","ticketCanvasColor2","ticketGradientAngle","ticketCornerStyle","ticketCornerRadius","ticketBorderWidth","ticketBorderColor"]){
-  $(id).addEventListener("input",updateTicketEditorGlobal);$(id).addEventListener("change",updateTicketEditorGlobal);
- }
- const propertyIds=["ticketPropX","ticketPropY","ticketPropW","ticketPropH","ticketPropText","ticketPropFontSize","ticketPropFontFamily","ticketPropFontWeight","ticketPropColor","ticketPropAlign","ticketPropVAlign","ticketPropLogoSource","ticketPropLogoFit","ticketPropShape","ticketPropFill","ticketPropStroke","ticketPropStrokeWidth","ticketPropRadius","ticketPropQrBackground","ticketPropQrBorder","ticketPropQrBorderWidth","ticketPropQrRadius"];
- propertyIds.forEach(id=>{$(id).addEventListener("input",updateTicketEditorElement);$(id).addEventListener("change",updateTicketEditorElement);});
+ const globalLiveIds=["ticketBackgroundType","ticketPattern","ticketCanvasColor1","ticketCanvasColor2","ticketCornerStyle","ticketBorderColor"];
+ globalLiveIds.forEach(id=>{$(id).addEventListener("input",updateTicketEditorGlobal);$(id).addEventListener("change",updateTicketEditorGlobal);});
+ const globalNumberIds=["ticketCanvasWidth","ticketCanvasHeight","ticketGradientAngle","ticketCornerRadius","ticketBorderWidth"];
+ globalNumberIds.forEach(id=>$(id).addEventListener("change",updateTicketEditorGlobal));
+ const propertyLiveIds=["ticketPropText","ticketPropFontFamily","ticketPropFontWeight","ticketPropColor","ticketPropAlign","ticketPropVAlign","ticketPropLogoSource","ticketPropLogoFit","ticketPropShape","ticketPropFill","ticketPropStroke","ticketPropRadius","ticketPropQrBackground","ticketPropQrBorder","ticketPropQrRadius"];
+ propertyLiveIds.forEach(id=>{$(id).addEventListener("input",updateTicketEditorElement);$(id).addEventListener("change",updateTicketEditorElement);});
+ const propertyNumberIds=["ticketPropX","ticketPropY","ticketPropW","ticketPropH","ticketPropFontSize","ticketPropStrokeWidth","ticketPropQrBorderWidth"];
+ propertyNumberIds.forEach(id=>$(id).addEventListener("change",updateTicketEditorElement));
  $("ticketEditorStage").addEventListener("pointerdown",ticketEditorPointerDown);
  $("ticketEditorStage").addEventListener("pointermove",ticketEditorPointerMove);
  $("ticketEditorStage").addEventListener("pointerup",ticketEditorPointerUp);
