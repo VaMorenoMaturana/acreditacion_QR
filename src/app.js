@@ -1226,9 +1226,10 @@ async function afterLogin(){
  }
  currentProfile=data;ticketSettings=loadTicketSettings();updateTicketDesignControls();setSignedIn(true);
  if(isSuperadmin){await initSuperadmin(supabase,currentUser);switchTab("superadmin");return;}
- await loadAll();if(currentProfile.role==="admin")void loadMailSettings();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
+ await loadAll();await loadTicketTemplates();if(currentProfile.role==="admin")void loadMailSettings();switchTab(currentProfile.role==="volunteer"?"checkin":"dashboard");
 }
 $("downloadCsvTemplateBtn").addEventListener("click",downloadCsvTemplate);$("createUserForm").addEventListener("submit",createManagedUser);$("activityForm").addEventListener("submit",saveActivity);$("clearActivity").addEventListener("click",clearActivityForm);$("registrationForm").addEventListener("submit",saveRegistration);$("importCsvBtn").addEventListener("click",importCsv);
+bindTicketEditorEvents();
 $("registrationFilter").addEventListener("change",()=>{selectedRegistrationIds.clear();renderRegistrations();say("bulkDeleteMessage","Selección reiniciada al cambiar el filtro.");});
 $("csvActivity").addEventListener("change",refreshCsvDuplicateWarnings);
 $("selectAllRegistrations").addEventListener("change",ev=>{
