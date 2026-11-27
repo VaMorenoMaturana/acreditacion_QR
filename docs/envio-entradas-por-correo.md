@@ -35,7 +35,7 @@ Si su proveedor solo ofrece los puertos restringidos, esta conexión SMTP direct
 - Cada persona recibe un correo dirigido únicamente a ella, con saludo personalizado y su propia entrada PDF adjunta.
 - Se omiten registros cancelados y personas sin correo válido.
 - Por defecto se omiten las personas que ya figuran como enviadas para esa actividad. La opción «Incluir también personas que ya recibieron una entrada anteriormente» permite reenvíos.
-- Cada intento se registra como `sending` antes de conectar con SMTP y luego se actualiza a `sent` o `failed`. Un índice único impide que dos envíos simultáneos queden activos para la misma inscripción. Si el resultado queda como `sending`, el correo pudo haberse aceptado pero la confirmación se perdió; revise el proveedor antes de activar un reenvío.
+- Cada intento se registra como `sending` antes de conectar con SMTP y luego se actualiza a `sent` o `failed`. Un índice único impide que dos envíos simultáneos queden activos para la misma inscripción. Si el resultado queda como `sending`, el correo pudo haberse aceptado pero la confirmación se perdió. El sistema bloquea reintentos durante 10 minutos. Después de ese plazo, el administrador debe revisar el proveedor SMTP y activar expresamente el reenvío; esto podría generar un correo duplicado si el primer envío sí fue aceptado.
 - Cada correo se procesa de forma individual y secuencial. La interfaz muestra avance y fallos por participante.
 
 ## Seguridad y límites
