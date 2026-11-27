@@ -531,7 +531,7 @@ function newTicketEditorDesign(){
  if(!ticketEditorIsAdmin())return;
  ticketEditorDesign=createDefaultTicketDesign();ticketEditorTemplateId="";ticketEditorSelectedId="";
  $("ticketEditorName").value="";
- $("ticketEditorDeleteBtn").classList.add("hidden");
+ $("ticketEditorCopyBtn").classList.add("hidden");$("ticketEditorDeleteBtn").classList.add("hidden");
  renderTicketEditorControls();renderTicketEditorStage();renderTicketInspector();
  say("ticketEditorMessage","Nueva plantilla en blanco lista para editar. Puede añadir, mover, redimensionar y eliminar elementos.");
 }
@@ -540,7 +540,7 @@ function copyTicketEditorTemplate(){
  const currentName=$("ticketEditorName").value.trim()||"Plantilla";
  ticketEditorTemplateId="";
  $("ticketEditorName").value=(currentName+" · copia").slice(0,80);
- $("ticketEditorDeleteBtn").classList.add("hidden");
+ $("ticketEditorCopyBtn").classList.add("hidden");$("ticketEditorDeleteBtn").classList.add("hidden");
  say("ticketEditorMessage","Está editando una copia independiente. Al guardar se creará una nueva plantilla y se conservará la original.");
 }
 function renderTicketEditorControls(){
@@ -764,7 +764,7 @@ async function saveTicketEditorTemplate(){
   ticketSettings.template="custom";ticketSettings.customTemplateId=result.id;
   ticketSettings.customDesign=normalizeTicketDesign(result.design);ticketSettings.customTemplateName=result.name;
   saveTicketSettings();updateTicketDesignControls();renderTicketPreview();
-  $("ticketEditorDeleteBtn").classList.remove("hidden");
+  $("ticketEditorDeleteBtn").classList.remove("hidden");$("ticketEditorCopyBtn").classList.remove("hidden");
   say("ticketEditorMessage","Plantilla «"+result.name+"» guardada y disponible para su organización.");
  }catch(error){
   console.error("Error al guardar plantilla:",error);
